@@ -1,11 +1,15 @@
 #include "waveform/renderers/allshader/waveformrenderbeat.h"
 
+#include <qnamespace.h>
+
 #include <QDomNode>
+#include <iterator>
 
 #include "engine/engine.h"
 #include "moc_waveformrenderbeat.cpp"
 #include "rendergraph/geometry.h"
-#include "rendergraph/material/unicolormaterial.h"
+#include "rendergraph/material/rgbamaterial.h"
+#include "rendergraph/vertexupdaters/rgbavertexupdater.h"
 #include "rendergraph/vertexupdaters/vertexupdater.h"
 #include "skin/legacy/skincontext.h"
 #include "track/track.h"
@@ -22,13 +26,18 @@ WaveformRenderBeat::WaveformRenderBeat(WaveformWidgetRenderer* waveformWidget,
         ::WaveformRendererAbstract::PositionSource type)
         : ::WaveformRendererAbstract(waveformWidget),
           m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip) {
-    initForRectangles<UniColorMaterial>(0);
+    initForRectangles<RGBAMaterial>(0);
     setUsePreprocess(true);
 }
 
 void WaveformRenderBeat::setup(const QDomNode& node, const SkinContext& skinContext) {
     m_color = QColor(skinContext.selectString(node, QStringLiteral("BeatColor")));
     m_color = WSkinColor::getCorrectColor(m_color).toRgb();
+
+    const QString downBeatColorName =
+            skinContext.selectString(node, QStringLiteral("DownBeatColor"));
+    m_downbeatColor = downBeatColorName.isEmpty() ? Qt::red : QColor(downBeatColorName);
+    m_downbeatColor = WSkinColor::getCorrectColor(m_downbeatColor).toRgb();
 }
 
 void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* event) {
@@ -64,15 +73,18 @@ bool WaveformRenderBeat::preprocessInner() {
         return false;
     }
 
+    int downbeatLength = m_waveformRenderer->getDownbeatLength();
+
 #ifndef __SCENEGRAPH__
     int alpha = m_waveformRenderer->getBeatGridAlpha();
     if (alpha == 0) {
         return false;
     }
     m_color.setAlphaF(alpha / 100.0f);
+    m_downbeatColor.setAlphaF(alpha / 100.0f);
 #endif
 
-    if (!m_color.alpha()) {
+    if (!m_color.alpha() && !m_downbeatColor.alpha()) {
         // Don't render the beatgrid lines is there are fully transparent
         return false;
     }
@@ -119,7 +131,15 @@ bool WaveformRenderBeat::preprocessInner() {
     const int reserved = numBeatsInRange * numVerticesPerLine * numBoxesPerBeat;
     geometry().allocate(reserved);
 
-    VertexUpdater vertexUpdater{geometry().vertexDataAs<Geometry::Point2D>()};
+    RGBAVertexUpdater vertexUpdater{geometry().vertexDataAs<Geometry::RGBAColoredPoint2D>()};
+
+    float beat_r = m_color.redF(), beat_g = m_color.greenF(),
+          beat_b = m_color.blueF(), beat_alpha = m_color.alphaF();
+    float downbeat_r = m_downbeatColor.redF(),
+          downbeat_g = m_downbeatColor.greenF(),
+          downbeat_b = m_downbeatColor.blueF(),
+          downbeat_alpha = m_downbeatColor.alphaF();
+    auto firstBeat = trackBeats->cfirstmarker();
 
     const float boxBreadth = splitStemTracks
             ? rendererBreadth / static_cast<float>(mixxx::kMaxSupportedStems)
@@ -138,22 +158,27 @@ bool WaveformRenderBeat::preprocessInner() {
         const float x1 = static_cast<float>(xBeatPoint);
         const float x2 = x1 + 1.f;
 
+        const bool isDownbeat = downbeatLength &&
+                std::distance(firstBeat, it) % downbeatLength == 0;
+        const QVector4D color = isDownbeat
+                ? QVector4D(downbeat_r, downbeat_g, downbeat_b, downbeat_alpha)
+                : QVector4D(beat_r, beat_g, beat_b, beat_alpha);
         if (m_isSlipRenderer && splitStemTracks) {
             for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; ++stemIdx) {
                 const float posy1 = stemIdx * boxBreadth;
                 const float posy2 = posy1 + boxBreadth / 2.f;
-                vertexUpdater.addRectangle({x1, posy1}, {x2, posy2});
+                vertexUpdater.addRectangle({x1, posy1}, {x2, posy2}, color);
             }
         } else {
             vertexUpdater.addRectangle({x1, 0.f},
-                    {x2, m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth});
+                    {x2, m_isSlipRenderer ? rendererBreadth / 2 : rendererBreadth},
+                    color);
         }
     }
     markDirtyGeometry();
 
     DEBUG_ASSERT(reserved == vertexUpdater.index());
 
-    material().setUniform(1, m_color);
     markDirtyMaterial();
 
     return true;
