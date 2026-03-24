@@ -1425,6 +1425,10 @@ add_library(
   src/library/trackset/crate/cratefeaturehelper.cpp
   src/library/trackset/crate/cratestorage.cpp
   src/library/trackset/crate/cratetablemodel.cpp
+  src/library/trackset/dynamiccrate/dynamiccrateconfig.cpp
+  src/library/trackset/dynamiccrate/dynamiccrateeditordialog.cpp
+  src/library/trackset/dynamiccrate/dynamiccratefeature.cpp
+  src/library/trackset/dynamiccrate/dynamiccratetablemodel.cpp
   src/library/trackset/playlistfeature.cpp
   src/library/trackset/setlogfeature.cpp
   src/library/trackset/tracksettablemodel.cpp
@@ -2705,6 +2709,7 @@ if(BUILD_TESTING)
     src/test/colormapperjsproxy_test.cpp
     src/test/colorpalette_test.cpp
     src/test/configobject_test.cpp
+    src/test/dynamiccrateconfig_test.cpp
     src/test/controller_mapping_validation_test.cpp
     src/test/controller_mapping_settings_test.cpp
     src/test/controllers/controller_columnid_regression_test.cpp
