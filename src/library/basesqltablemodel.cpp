@@ -1,5 +1,6 @@
 #include "library/basesqltablemodel.h"
 
+#include <QSqlError>
 #include <QUrl>
 #include <QtDebug>
 #include <algorithm>
@@ -214,8 +215,11 @@ void BaseSqlTableModel::select() {
     time.start();
 
     // Prepare query for id and all columns not in m_trackSource
+    const QString stableTableOrder = m_tableOrderBy.isEmpty()
+            ? QStringLiteral("ORDER BY %1 ASC").arg(m_idColumn)
+            : m_tableOrderBy + QStringLiteral(", %1 ASC").arg(m_idColumn);
     QString queryString = QString("SELECT %1 FROM %2 %3")
-                                  .arg(m_tableColumns.join(","), m_tableName, m_tableOrderBy);
+                                  .arg(m_tableColumns.join(","), m_tableName, stableTableOrder);
 
     if (sDebug) {
         qDebug() << this << "select() executing:" << queryString;
@@ -320,13 +324,14 @@ void BaseSqlTableModel::select() {
     // are contained multiple times in rowInfos (e.g. in history playlists)
     trackIdToRows.reserve(rowInfos.size());
     for (int i = 0; i < rowInfos.size(); ++i) {
-        const RowInfo& rowInfo = rowInfos[i];
+        RowInfo& rowInfo = rowInfos[i];
         if (rowInfo.row == -1) {
             // We've reached the end of valid rows. Resize rowInfo to cut off
             // this and all further elements.
             rowInfos.resize(i);
             break;
         }
+        captureSortValues(&rowInfo);
         trackIdToRows[rowInfo.trackId].push_back(i);
     }
     // The number of unique tracks cannot be greater than the
@@ -354,6 +359,151 @@ void BaseSqlTableModel::select() {
 
     qDebug() << this << "select() returned" << m_rowInfo.size()
              << "results in" << time.elapsed().debugMillisWithUnit();
+}
+
+void BaseSqlTableModel::captureSortValues(RowInfo* pRow) const {
+    pRow->sortValues.clear();
+    for (const auto& sortColumn : m_sortColumns) {
+        const int column = sortColumn.m_column;
+        pRow->sortValues.append(column < m_tableColumns.size()
+                        ? pRow->columnValues.value(column)
+                        : m_trackSource->data(pRow->trackId, column - m_tableColumns.size() + 1));
+    }
+}
+
+int BaseSqlTableModel::compareRows(const RowInfo& left, const RowInfo& right) const {
+    for (int i = 0; i < m_sortColumns.size(); ++i) {
+        const auto& sortColumn = m_sortColumns.at(i);
+        const int comparison = m_trackSource->compareColumnValues(
+                sortColumn.m_column - m_tableColumns.size() + 1,
+                sortColumn.m_order,
+                left.sortValues.value(i),
+                right.sortValues.value(i));
+        if (comparison != 0) {
+            return comparison;
+        }
+    }
+    return left.trackId == right.trackId ? 0 : left.trackId < right.trackId ? -1
+                                                                            : 1;
+}
+
+void BaseSqlTableModel::rebuildRowMappings() {
+    m_trackIdToRows.clear();
+    m_trackPosToRow.clear();
+    m_trackSortOrder.clear();
+    const int positionColumn = fieldIndex(ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_POSITION);
+    for (int row = 0; row < m_rowInfo.size(); ++row) {
+        auto& info = m_rowInfo[row];
+        info.row = row;
+        m_trackIdToRows[info.trackId].append(row);
+        m_trackSortOrder.insert(info.trackId, row);
+        if (positionColumn >= 0) {
+            m_trackPosToRow.insert(info.getPosition(positionColumn), row);
+        }
+    }
+}
+
+bool BaseSqlTableModel::refreshTrackRows(const QSet<TrackId>& trackIds, bool allTracks) {
+    if (!m_bInitialized || !m_trackSource || (!allTracks && trackIds.isEmpty())) {
+        return false;
+    }
+    QSet<TrackId> affectedIds = trackIds;
+    if (allTracks) {
+        for (const auto& row : m_rowInfo) {
+            affectedIds.insert(row.trackId);
+        }
+    }
+    QStringList idStrings;
+    for (const auto& id : trackIds) {
+        idStrings.append(id.toString());
+    }
+    const QString restriction = allTracks ? QString() : QStringLiteral(" WHERE %1 IN (%2)").arg(m_idColumn, idStrings.join(QLatin1Char(',')));
+    QSqlQuery query(m_database);
+    query.setForwardOnly(true);
+    if (!query.exec(QStringLiteral("SELECT %1 FROM %2%3")
+                        .arg(m_tableColumns.join(QLatin1Char(',')), m_tableName, restriction))) {
+        LOG_FAILED_QUERY(query);
+        return false;
+    }
+    QHash<TrackId, RowInfo> candidates;
+    QSet<TrackId> matchingIds;
+    while (query.next()) {
+        RowInfo info;
+        for (int column = 0; column < m_tableColumns.size(); ++column) {
+            info.columnValues.append(query.value(column));
+        }
+        info.trackId = TrackId(info.columnValues.first());
+        info.row = 0;
+        affectedIds.insert(info.trackId);
+        matchingIds.insert(info.trackId);
+        candidates.insert(info.trackId, std::move(info));
+    }
+    if (query.lastError().isValid()) {
+        LOG_FAILED_QUERY(query);
+        return false;
+    }
+    QHash<TrackId, int> filteredIds;
+    m_trackSource->filterAndSort(matchingIds, m_currentSearch, m_currentSearchFilter, m_trackSourceOrderBy, m_sortColumns, m_tableColumns.size() - 1, &filteredIds);
+    for (auto it = candidates.begin(); it != candidates.end();) {
+        if (!filteredIds.contains(it.key())) {
+            it = candidates.erase(it);
+        } else {
+            captureSortValues(&it.value());
+            ++it;
+        }
+    }
+    for (int row = m_rowInfo.size() - 1; row >= 0; --row) {
+        const auto id = m_rowInfo.at(row).trackId;
+        if (affectedIds.contains(id) && !candidates.contains(id)) {
+            beginRemoveRows(QModelIndex(), row, row);
+            m_rowInfo.removeAt(row);
+            rebuildRowMappings();
+            endRemoveRows();
+        }
+    }
+    auto ids = candidates.keys();
+    std::sort(ids.begin(), ids.end());
+    for (const auto& id : ids) {
+        RowInfo updated = candidates.value(id);
+        const auto previousRows = m_trackIdToRows.value(id);
+        int previousRow = previousRows.isEmpty() ? -1 : previousRows.first();
+        if (previousRow >= 0 && compareRows(m_rowInfo.at(previousRow), updated) == 0) {
+            m_rowInfo[previousRow] = std::move(updated);
+            m_rowInfo[previousRow].row = previousRow;
+            emit dataChanged(index(previousRow, 0), index(previousRow, columnCount() - 1));
+            continue;
+        }
+        int lower = 0;
+        int upper = m_rowInfo.size() - (previousRow >= 0 ? 1 : 0);
+        while (lower < upper) {
+            const int middle = lower + (upper - lower) / 2;
+            const int row = middle + (previousRow >= 0 && middle >= previousRow ? 1 : 0);
+            if (compareRows(m_rowInfo.at(row), updated) < 0) {
+                lower = middle + 1;
+            } else {
+                upper = middle;
+            }
+        }
+        if (previousRow < 0) {
+            beginInsertRows(QModelIndex(), lower, lower);
+            m_rowInfo.insert(lower, std::move(updated));
+            rebuildRowMappings();
+            endInsertRows();
+        } else {
+            if (lower != previousRow) {
+                beginMoveRows(QModelIndex(), previousRow, previousRow, QModelIndex(), lower > previousRow ? lower + 1 : lower);
+                m_rowInfo.removeAt(previousRow);
+                m_rowInfo.insert(lower, std::move(updated));
+                rebuildRowMappings();
+                endMoveRows();
+            } else {
+                m_rowInfo[previousRow] = std::move(updated);
+                m_rowInfo[previousRow].row = previousRow;
+            }
+            emit dataChanged(index(lower, 0), index(lower, columnCount() - 1));
+        }
+    }
+    return true;
 }
 
 void BaseSqlTableModel::setTable(QString tableName,
@@ -887,7 +1037,7 @@ void BaseSqlTableModel::removeTrackRows(const QSet<TrackId>& trackIdsToRemove) {
     // Recreate TrackId2Rows, taken from select()
     trackIdToRows.reserve(rowInfos.size());
     for (int i = 0; i < rowInfos.size(); ++i) {
-        const RowInfo& rowInfo = rowInfos[i];
+        RowInfo& rowInfo = rowInfos[i];
         if (rowInfo.row == -1) {
             // We've reached the end of valid rows. Resize rowInfo to cut off
             // this and all further elements.

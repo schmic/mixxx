@@ -493,12 +493,17 @@ void BaseTrackCache::filterAndSort(const QSet<TrackId>& trackIds,
             m_pQueryParser->parseQuery(searchPlusExtraFilter, QString());
 
     QString filter = pQuery->toSql();
-    if (!filter.isEmpty()) {
-        filter.prepend("WHERE ");
+    if (filter.isEmpty()) {
+        filter = QStringLiteral("1");
     }
+    filter = QStringLiteral("WHERE (%1) AND %2 IN (%3)")
+                     .arg(filter, m_idColumn, idStrings.join(QLatin1Char(',')));
+    const QString stableOrder = orderByClause.trimmed().isEmpty()
+            ? QStringLiteral("ORDER BY %1 ASC").arg(m_idColumn)
+            : orderByClause + QStringLiteral(", %1 ASC").arg(m_idColumn);
 
     QString queryString = QString("SELECT %1 FROM %2 %3 %4")
-            .arg(m_idColumn, m_tableName, filter, orderByClause);
+                                  .arg(m_idColumn, m_tableName, filter, stableOrder);
 
     if (sDebug) {
         qDebug() << this << "select() executing:" << queryString;
@@ -616,9 +621,6 @@ int BaseTrackCache::findSortInsertionPoint(TrackPointer pTrack,
         const int columnOffset,
         const QVector<TrackId>& trackIds) const {
     QList<QVariant> trackValues;
-    if (sortColumns.isEmpty()) {
-        return 0;
-    }
     for (const auto& sc: sortColumns) {
         trackValues.append(getTrackValueForColumn(pTrack, sc.m_column - columnOffset));
     }
@@ -628,7 +630,7 @@ int BaseTrackCache::findSortInsertionPoint(TrackPointer pTrack,
 
     if (sDebug) {
         qDebug() << this << "Trying to insertion sort:"
-                 << trackValues.at(0) << "min" << min << "max" << max;
+                 << trackValues << "min" << min << "max" << max;
     }
 
     // If trackIds is empty, min is 0 and max is -1 so findSortInsertionPoint
@@ -661,11 +663,9 @@ int BaseTrackCache::findSortInsertionPoint(TrackPointer pTrack,
         }
 
         if (compare == 0) {
-            // Alright, if we're here then we can insert it here and be
-            // "correct"
-            min = mid;
-            break;
-        } else if (compare > 0) {
+            compare = pTrack->getId() < otherTrackId ? -1 : 1;
+        }
+        if (compare > 0) {
             min = mid + 1;
         } else {
             max = mid - 1;

@@ -75,6 +75,8 @@ class BaseTrackCache : public QObject {
     virtual bool isCached(TrackId trackId) const;
     virtual void ensureCached(TrackId trackId);
 
+    int compareColumnValues(int sortColumn, Qt::SortOrder sortOrder, const QVariant& val1, const QVariant& val2) const;
+
   signals:
     void tracksChanged(const QSet<TrackId>& trackIds);
 
@@ -102,10 +104,6 @@ class BaseTrackCache : public QObject {
                                const QList<SortColumn>& sortColumns,
                                const int columnOffset,
                                const QVector<TrackId>& trackIds) const;
-    int compareColumnValues(int sortColumn,
-            Qt::SortOrder sortOrder,
-            const QVariant& val1,
-            const QVariant& val2) const;
 
     const QString m_tableName;
     const QString m_idColumn;
