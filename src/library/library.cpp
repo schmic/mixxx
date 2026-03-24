@@ -28,6 +28,7 @@
 #include "library/trackcollectionmanager.h"
 #include "library/trackmodel.h"
 #include "library/trackset/crate/cratefeature.h"
+#include "library/trackset/dynamiccrate/dynamiccratefeature.h"
 #include "library/trackset/playlistfeature.h"
 #include "library/trackset/setlogfeature.h"
 #include "library/traktor/traktorfeature.h"
@@ -129,6 +130,8 @@ Library::Library(
             &Library::exportCrate, // signal-to-signal
             Qt::DirectConnection);
 #endif
+
+    addFeature(new DynamicCrateFeature(this, m_pConfig));
 
     m_pBrowseFeature = new BrowseFeature(
             this, m_pConfig, pRecordingManager);

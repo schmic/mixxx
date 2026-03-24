@@ -98,6 +98,8 @@ class BaseSqlTableModel : public BaseTrackTableModel {
             QStringList tableColumns,
             QSharedPointer<BaseTrackCache> trackSource);
 
+    bool refreshTrackRows(const QSet<TrackId>& trackIds, bool allTracks = false);
+
     virtual void initSortColumnMapping();
 
     TrackCollectionManager* const m_pTrackCollectionManager;
@@ -131,6 +133,7 @@ class BaseSqlTableModel : public BaseTrackTableModel {
         TrackId trackId;
         int row;
         QVector<QVariant> columnValues;
+        QVector<QVariant> sortValues;
 
         int getPosition(int posCol) const {
             if (posCol < 0) {
@@ -158,6 +161,9 @@ class BaseSqlTableModel : public BaseTrackTableModel {
     typedef QHash<TrackId, QVector<int>> TrackId2Rows;
     typedef QHash<int, int> TrackPos2Row;
 
+    void captureSortValues(RowInfo* pRow) const;
+    int compareRows(const RowInfo& left, const RowInfo& right) const;
+    void rebuildRowMappings();
     void clearRows();
     void replaceRows(
             QVector<RowInfo>&& rows,
