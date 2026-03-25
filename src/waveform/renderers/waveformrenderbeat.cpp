@@ -1,6 +1,8 @@
 #include "waveform/renderers/waveformrenderbeat.h"
 
 #include <QPainter>
+#include <QPainterPath>
+#include <algorithm>
 
 #include "track/track.h"
 #include "util/painterscope.h"
@@ -8,6 +10,42 @@
 #include "widget/wskincolor.h"
 
 class QPaintEvent;
+
+namespace {
+
+constexpr int kPhraseMarkerPeriodBeats = 4;
+const QColor kDefaultPhraseMarkerColor(224, 64, 64);
+
+qreal phraseMarkerHalfWidth(double scaleFactor) {
+    return std::max<qreal>(3.0, scaleFactor * 3.5);
+}
+
+qreal phraseMarkerHeight(double scaleFactor) {
+    return std::max<qreal>(4.0, scaleFactor * 5.0);
+}
+
+bool isPhraseMarkerBeat(int beatIndex) {
+    return beatIndex % kPhraseMarkerPeriodBeats == 0;
+}
+
+void appendPhraseMarker(QPainterPath* path,
+        Qt::Orientation orientation,
+        qreal beatPoint,
+        qreal halfWidth,
+        qreal height) {
+    if (orientation == Qt::Horizontal) {
+        path->moveTo(beatPoint - halfWidth, 0.0);
+        path->lineTo(beatPoint + halfWidth, 0.0);
+        path->lineTo(beatPoint, height);
+    } else {
+        path->moveTo(0.0, beatPoint - halfWidth);
+        path->lineTo(0.0, beatPoint + halfWidth);
+        path->lineTo(height, beatPoint);
+    }
+    path->closeSubpath();
+}
+
+} // namespace
 
 WaveformRenderBeat::WaveformRenderBeat(WaveformWidgetRenderer* waveformWidgetRenderer)
         : WaveformRendererAbstract(waveformWidgetRenderer) {
@@ -20,6 +58,11 @@ WaveformRenderBeat::~WaveformRenderBeat() {
 void WaveformRenderBeat::setup(const QDomNode& node, const SkinContext& context) {
     m_beatColor = QColor(context.selectString(node, "BeatColor"));
     m_beatColor = WSkinColor::getCorrectColor(m_beatColor).toRgb();
+    QColor phraseMarkerColor(context.selectString(node, "PhraseMarkerColor"));
+    m_phraseMarkerColor = WSkinColor::getCorrectColor(
+            phraseMarkerColor.isValid() ? phraseMarkerColor
+                                        : kDefaultPhraseMarkerColor)
+                                  .toRgb();
 }
 
 void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
@@ -44,8 +87,10 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
     // a large rectangle encompassing all beatlines is drawn.
     m_beatColor.setAlphaF(1.f);
 #else
-    m_beatColor.setAlphaF(alpha/100.0);
+    m_beatColor.setAlphaF(alpha / 100.0);
 #endif
+    QColor phraseMarkerColor = m_phraseMarkerColor;
+    phraseMarkerColor.setAlphaF(alpha / 100.0f);
 
     const double trackSamples = m_waveformRenderer->getTrackSamples();
     if (trackSamples <= 0) {
@@ -85,10 +130,15 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
     const Qt::Orientation orientation = m_waveformRenderer->getOrientation();
     const float rendererWidth = m_waveformRenderer->getWidth();
     const float rendererHeight = m_waveformRenderer->getHeight();
+    const qreal triangleHalfWidth = phraseMarkerHalfWidth(scaleFactor());
+    const qreal triangleHeight = phraseMarkerHeight(scaleFactor());
+    const auto referenceBeat = trackBeats->cfirstmarker();
+    QPainterPath phraseMarkers;
 
     int beatCount = 0;
+    int beatIndex = it - referenceBeat;
 
-    for (; it != trackBeats->cend() && *it <= endPosition; ++it) {
+    for (; it != trackBeats->cend() && *it <= endPosition; ++it, ++beatIndex) {
         double beatPosition = it->toEngineSamplePos();
         double xBeatPoint =
                 m_waveformRenderer->transformSamplePositionInRendererWorld(beatPosition);
@@ -105,8 +155,14 @@ void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* /*event*/) {
         } else {
             m_beats[beatCount++].setLine(0.0f, xBeatPoint, rendererWidth, xBeatPoint);
         }
+
+        if (isPhraseMarkerBeat(beatIndex)) {
+            appendPhraseMarker(
+                    &phraseMarkers, orientation, xBeatPoint, triangleHalfWidth, triangleHeight);
+        }
     }
 
     // Make sure to use constData to prevent detaches!
     painter->drawLines(m_beats.constData(), beatCount);
+    painter->fillPath(phraseMarkers, phraseMarkerColor);
 }
