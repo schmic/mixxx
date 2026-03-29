@@ -51,7 +51,9 @@ void MappingInfoEnumerator::loadSupportedMappings() {
     m_bulkMappings.clear();
 
     for (const QString& dirPath : std::as_const(m_controllerDirPaths)) {
-        QDirIterator it(dirPath);
+        QDirIterator it(dirPath,
+                QDir::Files,
+                QDirIterator::Subdirectories);
         while (it.hasNext()) {
             it.next();
             const QString path = it.filePath();
