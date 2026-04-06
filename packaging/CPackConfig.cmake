@@ -54,6 +54,9 @@ if(CPACK_GENERATOR STREQUAL "External")
 endif()
 
 if(CPACK_GENERATOR STREQUAL "AppImage")
+  if(CPACK_MIXXX_APPIMAGE_FILE_NAME)
+    set(CPACK_PACKAGE_FILE_NAME "${CPACK_MIXXX_APPIMAGE_FILE_NAME}")
+  endif()
   # The AppImage desktop file regenerates Exec= to "mixxx" (it must refer to the
   # binary by basename only, as CPack matches it against an installed file).
   set(CPACK_APPIMAGE_DESKTOP_FILE "mixxx-appimage.desktop")

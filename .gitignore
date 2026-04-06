@@ -3,6 +3,8 @@
 # affect other developers. Instead ignore those patterns through your global
 # gitignore or locally in .git/info/exclude.
 
+.ccache
+
 # Logs
 *.log
 *.log.*
