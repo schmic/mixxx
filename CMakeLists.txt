@@ -2713,6 +2713,7 @@ if(BUILD_TESTING)
     src/test/dynamiccrateconfig_test.cpp
     src/test/controller_mapping_validation_test.cpp
     src/test/controller_mapping_settings_test.cpp
+    src/test/controllermappinginfoenumerator_test.cpp
     src/test/controllers/controller_columnid_regression_test.cpp
     src/test/controllerscriptenginelegacy_test.cpp
     src/test/controlobjecttest.cpp
