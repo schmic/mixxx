@@ -88,7 +88,7 @@ case "$1" in
         fi
         ;;
 
-    setup)
+    setup|env)
         BUILDENV_PATH="${BUILDENV_BASEPATH}/${BUILDENV_NAME}"
 
         # vcpkg.cmake is at BUILDENV_PATH/scripts/buildsystems/, matching the
@@ -102,6 +102,10 @@ case "$1" in
         export BUILDENV_SHA256="${BUILDENV_SHA256}"
         export VCPKG_TARGET_TRIPLET="${VCPKG_TARGET_TRIPLET}"
         export CMAKE_PREFIX_PATH="${BUILDENV_PATH}/installed/${VCPKG_TARGET_TRIPLET}"
+
+        if [ "$1" = "env" ]; then
+            return 0
+        fi
 
         # The CPack AppImage generator requires CMake >= 4.2 (added in CMake
         # 4.2).  Resolve this before installing any system packages, so a

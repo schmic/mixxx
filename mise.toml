@@ -1,0 +1,83 @@
+[env]
+MIXXX_SRC = "{{ config_root }}"
+MIXXX_BUILD = "{{ config_root }}/build"
+MIXXX_BUILD_DEBUG = "{{ config_root }}/build-debug"
+MIXXX_BUILD_APPIMAGE = "{{ config_root }}/build-appimage-ubuntu22"
+MIXXX_APPIMAGE_CONTAINER = "localhost/mixxx-appimage:ubuntu22"
+MIXXX_FEDORA_RELEASE = "44"
+MIXXX_BUILD_FEDORA = "{{ config_root }}/build-fedora44"
+MIXXX_FEDORA_CONTAINER = "localhost/mixxx-fedora:44"
+BUILDENV_BASEPATH = "{{ env.HOME }}/.cache/mixxx/buildenv"
+CMAKE_GENERATOR = "Ninja"
+CMAKE_BUILD_PARALLEL_LEVEL = "4"
+CCACHE_DIR = "{{ config_root }}/.ccache"
+
+[tasks.ccache]
+description = "Vergroessert den ccache fuer haeufige Rebuilds"
+run = "ccache --set-config=max_size=16G"
+
+[tasks.configure]
+description = "Konfiguriert Mixxx als Out-of-Source-Build"
+depends = ["ccache"]
+run = """
+cmake \
+  -S "$MIXXX_SRC" \
+  -B "$MIXXX_BUILD" \
+  -G "$CMAKE_GENERATOR" \
+  -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
+"""
+
+[tasks.build_all]
+description = "Baut alle Targets inkl. Tests"
+run = "cmake --build \"$MIXXX_BUILD\""
+
+[tasks.build]
+description = "Baut nur das Mixxx-Binary"
+run = "cmake --build \"$MIXXX_BUILD\" --target mixxx"
+
+[tasks.install]
+description = "Installiert Mixxx nach /usr/local"
+run = "sudo cmake --install build"
+
+[tasks.mixxx]
+description = "Startet Mixxx direkt aus dem Build-Verzeichnis"
+run = "\"$MIXXX_BUILD_APPIMAGE\"/mixxx.AppImage"
+
+[tasks.it]
+description = "Startet Mixxx direkt aus dem Build-Verzeichnis"
+run = "\"$MIXXX_BUILD_APPIMAGE\"/mixxx.AppImage --new-ui-skin mixxx-touchqml-skin --allow-dangerous-data-corruption-risk --developer"
+
+[tasks.debug-configure]
+description = "Konfiguriert den Debug Out-of-Source-Build mit fatalen Assertions"
+run = """
+cmake \
+  -S "$MIXXX_SRC" \
+  -B "$MIXXX_BUILD_DEBUG" \
+  -G "$CMAKE_GENERATOR" \
+  -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DDEBUG_ASSERTIONS_FATAL=ON \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+"""
+
+[tasks.debug-build]
+description = "Baut den Debug-Build"
+depends = ["debug-configure"]
+run = "cmake --build \"$MIXXX_BUILD_DEBUG\""
+
+[tasks.appimage-setup]
+run = "bash \"$MIXXX_SRC/tools/appimage_container.sh\" setup"
+
+[tasks.appimage]
+run = "bash \"$MIXXX_SRC/tools/appimage_container.sh\" build"
+
+[tasks.fedora-setup]
+run = "bash \"$MIXXX_SRC/tools/fedora_container.sh\" setup"
+
+[tasks.fedora]
+run = "bash \"$MIXXX_SRC/tools/fedora_container.sh\" build"
+
+[tasks.clean]
+description = "Entfernt die Out-of-Source-Build-Verzeichnisse"
+run = "rm -rf \"$MIXXX_BUILD\" \"$MIXXX_BUILD_DEBUG\""
