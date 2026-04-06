@@ -56,3 +56,11 @@ res/          Resources (controllers/ JS/XML, skins/, qml/)
 cmake/        CMake modules
 tools/        Python helper scripts
 ```
+
+## Update procedure
+
+Fetch changes from upstream remote, then rebase upstream/main and upstream/2.6 onto our local branches.
+Also try to rebase onto our feature-branches. feature-branches based on 2.6 are suffixed with -stable
+and should therefor have the upstream/2.6 rebased onto them.
+
+If you encounter issues try to fix them on your own for each feature.
