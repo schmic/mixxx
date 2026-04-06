@@ -1,0 +1,64 @@
+[tools]
+
+[env]
+MIXXX_SRC = "{{ config_root }}"
+MIXXX_BUILD = "{{ config_root }}/build"
+MIXXX_BUILD_DEBUG = "{{ config_root }}/build-debug"
+CMAKE_GENERATOR = "Ninja"
+CMAKE_BUILD_PARALLEL_LEVEL = "12"
+CCACHE_DIR = "{{ config_root }}/.ccache"
+
+[tasks.ccache]
+description = "Vergroessert den ccache fuer haeufige Rebuilds"
+run = "ccache --set-config=max_size=20G"
+
+[tasks.configure]
+description = "Konfiguriert Mixxx als Out-of-Source-Build"
+depends = ["ccache"]
+run = """
+cmake \
+  -S "$MIXXX_SRC" \
+  -B "$MIXXX_BUILD" \
+  -G "$CMAKE_GENERATOR" \
+  -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
+"""
+
+[tasks.build_all]
+description = "Baut alle Targets inkl. Tests"
+run = "cmake --build \"$MIXXX_BUILD\""
+
+[tasks.build]
+description = "Baut nur das Mixxx-Binary"
+run = "cmake --build \"$MIXXX_BUILD\" --target mixxx"
+
+[tasks.install]
+description = "Installiert Mixxx nach /usr/local"
+run = "sudo env \"PATH=$PATH\" cmake --install build"
+
+[tasks.mixxx]
+description = "Startet Mixxx direkt aus dem Build-Verzeichnis"
+run = "\"$MIXXX_BUILD\"/mixxx"
+
+[tasks.debug-configure]
+description = "Konfiguriert den Debug Out-of-Source-Build mit fatalen Assertions"
+run = """
+cmake \
+  -S "$MIXXX_SRC" \
+  -B "$MIXXX_BUILD_DEBUG" \
+  -G "$CMAKE_GENERATOR" \
+  -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DDEBUG_ASSERTIONS_FATAL=ON \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+"""
+
+[tasks.debug-build]
+description = "Baut den Debug-Build"
+depends = ["debug-configure"]
+run = "cmake --build \"$MIXXX_BUILD_DEBUG\""
+
+[tasks.clean]
+description = "Entfernt die Out-of-Source-Build-Verzeichnisse"
+run = "rm -rf \"$MIXXX_BUILD\" \"$MIXXX_BUILD_DEBUG\""
+

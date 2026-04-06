@@ -24,7 +24,7 @@ case "$1" in
         # install, with the exception of replacing Qt 5 with Qt 6 (once 2.5 is
         # released, we could install `dnf-command(builddep)` and then use `dnf
         # builddep mixxx`).
-        sudo dnf install -y \
+        sudo dnf install -y --allowerasing \
             appstream \
             ccache \
             chrpath \
