@@ -25,7 +25,9 @@ namespace allshader {
 WaveformRenderBeat::WaveformRenderBeat(WaveformWidgetRenderer* waveformWidget,
         ::WaveformRendererAbstract::PositionSource type)
         : ::WaveformRendererAbstract(waveformWidget),
-          m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip) {
+          m_isSlipRenderer(type == ::WaveformRendererAbstract::Slip),
+          m_introStartPosCO(m_waveformRenderer->getGroup(),
+                  QStringLiteral("intro_start_position")) {
     initForRectangles<RGBAMaterial>(0);
     setUsePreprocess(true);
 }
@@ -38,6 +40,64 @@ void WaveformRenderBeat::setup(const QDomNode& node, const SkinContext& skinCont
             skinContext.selectString(node, QStringLiteral("DownBeatColor"));
     m_downbeatColor = downBeatColorName.isEmpty() ? Qt::red : QColor(downBeatColorName);
     m_downbeatColor = WSkinColor::getCorrectColor(m_downbeatColor).toRgb();
+}
+
+void WaveformRenderBeat::onSetTrack() {
+    if (m_pLoadedTrack) {
+        disconnect(m_pLoadedTrack.get(),
+                &Track::beatsUpdated,
+                this,
+                &WaveformRenderBeat::slotBeatsUpdated);
+        disconnect(m_pLoadedTrack.get(),
+                &Track::cuesUpdated,
+                this,
+                &WaveformRenderBeat::slotCuesUpdated);
+    }
+
+    const TrackPointer pTrack = m_waveformRenderer->getTrackInfo();
+    m_pLoadedTrack = pTrack;
+    slotBeatsUpdated();
+
+    if (!pTrack) {
+        return;
+    }
+
+    connect(pTrack.get(),
+            &Track::beatsUpdated,
+            this,
+            &WaveformRenderBeat::slotBeatsUpdated);
+    connect(pTrack.get(),
+            &Track::cuesUpdated,
+            this,
+            &WaveformRenderBeat::slotCuesUpdated);
+}
+
+void WaveformRenderBeat::slotBeatsUpdated() {
+    setFirstDownbeatMaybeInvalid();
+}
+
+void WaveformRenderBeat::slotCuesUpdated() {
+    setFirstDownbeatMaybeInvalid();
+}
+
+void WaveformRenderBeat::setFirstDownbeatMaybeInvalid() {
+    mixxx::audio::FramePos introCuePos;
+    if (!m_pLoadedTrack) {
+        m_pTrackBeats.reset();
+    } else {
+        m_pTrackBeats = m_pLoadedTrack->getBeats();
+        introCuePos = mixxx::audio::FramePos::fromEngineSamplePosMaybeInvalid(
+                m_introStartPosCO.get());
+    }
+
+    m_firstDownBeat = std::nullopt;
+    if (m_pTrackBeats && introCuePos.isValid()) {
+        auto introCueBeatPos = m_pTrackBeats->findClosestBeat(introCuePos);
+        auto beatIt = m_pTrackBeats->iteratorFrom(introCueBeatPos);
+        if (beatIt != m_pTrackBeats->cend()) {
+            m_firstDownBeat = beatIt;
+        }
+    }
 }
 
 void WaveformRenderBeat::draw(QPainter* painter, QPaintEvent* event) {
@@ -54,12 +114,12 @@ void WaveformRenderBeat::preprocess() {
 }
 
 bool WaveformRenderBeat::preprocessInner() {
-    const TrackPointer trackInfo = m_waveformRenderer->getTrackInfo();
-
-    if (!trackInfo || (m_isSlipRenderer && !m_waveformRenderer->isSlipActive())) {
+    if (!m_pTrackBeats ||
+            (m_isSlipRenderer && !m_waveformRenderer->isSlipActive())) {
         return false;
     }
 
+    const TrackPointer trackInfo = m_waveformRenderer->getTrackInfo();
     const bool isStemTrack = trackInfo && trackInfo->hasStem() &&
             trackInfo->getWaveform() && trackInfo->getWaveform()->hasStem();
     const bool splitStemTracks = isStemTrack && WaveformWidgetFactory::isCreated() &&
@@ -67,10 +127,6 @@ bool WaveformRenderBeat::preprocessInner() {
 
     const double trackSamples = m_waveformRenderer->getTrackSamples();
     if (trackSamples <= 0.0) {
-        return false;
-    }
-    mixxx::BeatsPointer trackBeats = trackInfo->getBeats();
-    if (!trackBeats) {
         return false;
     }
 
@@ -112,11 +168,11 @@ bool WaveformRenderBeat::preprocessInner() {
 
     // Count the number of beats in the range to reserve space in the m_vertices vector.
     // Note that we could also use
-    //   int numBearsInRange = trackBeats->numBeatsInRange(startPosition, endPosition);
+    //   int numBearsInRange = m_pTrackBeats->numBeatsInRange(startPosition, endPosition);
     // for this, but there have been reports of that method failing with a DEBUG_ASSERT.
     int numBeatsInRange = 0;
-    for (auto it = trackBeats->iteratorFrom(startPosition);
-            it != trackBeats->cend() && *it <= endPosition;
+    for (auto it = m_pTrackBeats->iteratorFrom(startPosition);
+            it != m_pTrackBeats->cend() && *it <= endPosition;
             ++it) {
         numBeatsInRange++;
     }
@@ -135,18 +191,22 @@ bool WaveformRenderBeat::preprocessInner() {
           downbeat_g = m_downbeatColor.greenF(),
           downbeat_b = m_downbeatColor.blueF(),
           downbeat_alpha = m_downbeatColor.alphaF();
-    auto firstBeat = trackBeats->cfirstmarker();
 
     const float boxBreadth = splitStemTracks
             ? rendererBreadth / static_cast<float>(mixxx::kMaxSupportedStems)
             : rendererBreadth;
 
+    std::optional<mixxx::Beats::ConstIterator> firstDownbeat = std::nullopt;
     auto* pWaveformWidgetFactory = WaveformWidgetFactory::instance();
-    bool downbeatsEnabled = pWaveformWidgetFactory->getDownbeatsEnabled();
+    bool downbeatsEnabled = false;
     int downbeatDistance = pWaveformWidgetFactory->getDownbeatDistance();
+    if (pWaveformWidgetFactory->getDownbeatsEnabled() && m_firstDownBeat.has_value()) {
+        downbeatsEnabled = true;
+        firstDownbeat = *m_firstDownBeat;
+    }
 
-    for (auto it = trackBeats->iteratorFrom(startPosition);
-            it != trackBeats->cend() && *it <= endPosition;
+    for (auto it = m_pTrackBeats->iteratorFrom(startPosition);
+            it != m_pTrackBeats->cend() && *it <= endPosition;
             ++it) {
         double beatPosition = it->toEngineSamplePos();
         double xBeatPoint =
@@ -159,7 +219,7 @@ bool WaveformRenderBeat::preprocessInner() {
         const float x2 = x1 + 1.f;
 
         const bool isDownbeat = downbeatsEnabled &&
-                std::distance(firstBeat, it) % downbeatDistance == 0;
+                std::distance(*firstDownbeat, it) % downbeatDistance == 0;
         const QVector4D color = isDownbeat
                 ? QVector4D(downbeat_r, downbeat_g, downbeat_b, downbeat_alpha)
                 : QVector4D(beat_r, beat_g, beat_b, beat_alpha);
