@@ -363,7 +363,7 @@ if(MSVC)
   # Microsoft Visual Studio Compiler
   add_compile_options(/UTF8)
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    # Target architecture is x64 -> x64 has alsways SSE and SSE2 instruction sets
+    # Target architecture is x64 -> x64 has always SSE and SSE2 instruction sets
     message(STATUS "x64 Enabling SSE2 CPU optimizations (>= Pentium 4)")
     # Define gcc/clang style defines for SSE and SSE2 for compatibility
     add_compile_definitions("__SSE__" "__SSE2__")
@@ -2468,6 +2468,20 @@ if(ENGINEPRIME)
     # This is worked around by changing the list separator.
     string(REPLACE ";" "|" PIPE_DELIMITED_CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}")
 
+    # Apple Clang >= 16 enabled -Wdeprecated-literal-operator by default and
+    # treats it as an error, which breaks the libdjinterop build because the
+    # library uses the deprecated whitespace syntax (operator"" _suffix).
+    # GCC does not have this warning at all and rejects unknown -Wno-error=
+    # flags, so we only pass the suppression flag on Apple Clang.
+    set(DJINTEROP_EXTRA_CMAKE_ARGS "")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+      list(
+        APPEND
+        DJINTEROP_EXTRA_CMAKE_ARGS
+        -DCMAKE_CXX_FLAGS=-Wno-error=deprecated-literal-operator
+      )
+    endif()
+
     # For offline builds download the archive file from the URL and
     # copy it into DOWNLOAD_DIR under DOWNLOAD_NAME prior to starting
     # the configuration.
@@ -2501,7 +2515,7 @@ if(ENGINEPRIME)
         -$<IF:$<BOOL:${CMAKE_OSX_ARCHITECTURES}>,D,U>CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
         -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
         -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
-        -DSYSTEM_SQLITE=${DJINTEROP_SYSTEM_SQLITE}
+        -DSYSTEM_SQLITE=${DJINTEROP_SYSTEM_SQLITE} ${DJINTEROP_EXTRA_CMAKE_ARGS}
       BUILD_COMMAND ${CMAKE_COMMAND} --build . --target DjInterop
       BUILD_BYPRODUCTS <INSTALL_DIR>/${DJINTEROP_LIBRARY}
       EXCLUDE_FROM_ALL TRUE
