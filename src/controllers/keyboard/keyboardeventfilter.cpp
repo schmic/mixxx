@@ -1,5 +1,6 @@
 #include "controllers/keyboard/keyboardeventfilter.h"
 
+#include <QAction>
 #include <QEvent>
 #include <QKeyEvent>
 #include <QtDebug>
@@ -12,6 +13,29 @@
 namespace {
 const QString mappingFilePath(const QString& dir, const QString& fileName) {
     return QDir(dir).filePath(fileName + QStringLiteral(".kbd.cfg"));
+}
+
+// Returns a QKeySequence from str, or an empty QKeySequence if str contains an
+// invalid key name. Prevents a macOS crash where QCocoaMenuItem::sync() cannot
+// convert Qt::Key_unknown (> 0xFFFF) to QChar. See
+// https://github.com/mixxxdj/mixxx/issues/16216
+QKeySequence safeKeySequence(const QString& str) {
+    if (str.isEmpty()) {
+        return {};
+    }
+    const QKeySequence ks(str);
+    for (int i = 0; i < ks.count(); ++i) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        const Qt::Key key = ks[i].key();
+#else
+        const int key = ks[i] & ~Qt::KeyboardModifierMask;
+#endif
+        if (key == Qt::Key_unknown) {
+            qWarning() << "Ignoring invalid keyboard shortcut:" << str;
+            return {};
+        }
+    }
+    return ks;
 }
 } // anonymous namespace
 
@@ -329,10 +353,45 @@ QString KeyboardEventFilter::buildShortcutString(
     return shortcutTooltip;
 }
 
+void KeyboardEventFilter::registerMenuBarActionSetShortcut(QAction* pAction,
+        const ConfigKey& cfgKey,
+        const QString& defaultShortcut) {
+    VERIFY_OR_DEBUG_ASSERT(pAction) {
+        return;
+    }
+    VERIFY_OR_DEBUG_ASSERT(cfgKey.isValid()) {
+        return;
+    }
+    // TODO Allow clearing the shortcut so it can be used for something else ??
+    m_menuBarActions.emplace(pAction, std::make_pair(cfgKey, defaultShortcut));
+    const QKeySequence ks = safeKeySequence(m_pKbdConfig->getValue(cfgKey, defaultShortcut));
+    pAction->setShortcut(ks);
+    pAction->setShortcutContext(Qt::ApplicationShortcut);
+}
+
+void KeyboardEventFilter::clearMenuBarActions() {
+    m_menuBarActions.clear();
+}
+
+void KeyboardEventFilter::updateMenuBarActionShortcuts() {
+    QHashIterator<QAction*, std::pair<ConfigKey, QString>> it(m_menuBarActions);
+    while (it.hasNext()) {
+        it.next();
+        auto* pAction = it.key();
+        VERIFY_OR_DEBUG_ASSERT(pAction) {
+            continue;
+        }
+        const QString keyStr = m_pKbdConfig->getValue(it.value().first, it.value().second);
+        const QKeySequence ks = safeKeySequence(keyStr);
+        pAction->setShortcut(ks);
+    }
+}
+
 void KeyboardEventFilter::reloadKeyboardConfig() {
     createKeyboardConfig();
     updateWidgetShortcuts();
     updateSearchBarShortcuts();
+    updateMenuBarActionShortcuts();
 }
 
 void KeyboardEventFilter::createKeyboardConfig() {
