@@ -154,12 +154,14 @@ void SoundSourceFFmpeg::initChannelLayoutFromStream(
         // layout, e.g. for a mono WAV files with a single channel!
         av_channel_layout_default(pUninitializedChannelLayout,
                 avStream.codecpar->ch_layout.nb_channels);
-        kLogger.info()
-                << "Unknown channel layout -> using default layout"
-                << pUninitializedChannelLayout->order
-                << "for"
-                << avStream.codecpar->ch_layout.nb_channels
-                << "channel(s)";
+        if (avStream.codecpar->ch_layout.nb_channels > 1) {
+            kLogger.warning()
+                    << "Unknown channel layout -> using default layout"
+                    << pUninitializedChannelLayout->order
+                    << "for"
+                    << avStream.codecpar->ch_layout.nb_channels
+                    << "channels";
+        }
     } else {
         av_channel_layout_default(pUninitializedChannelLayout, 0);
         av_channel_layout_copy(pUninitializedChannelLayout, &avStream.codecpar->ch_layout);
@@ -173,12 +175,14 @@ int64_t SoundSourceFFmpeg::getStreamChannelLayout(const AVStream& avStream) {
         // Workaround: FFmpeg sometimes fails to determine the channel
         // layout, e.g. for a mono WAV files with a single channel!
         channel_layout = av_get_default_channel_layout(avStream.codecpar->channels);
-        kLogger.info()
-                << "Unknown channel layout -> using default layout"
-                << channel_layout
-                << "for"
-                << avStream.codecpar->channels
-                << "channel(s)";
+        if (avStream.codecpar->channels > 1) {
+            kLogger.warning()
+                    << "Unknown channel layout -> using default layout"
+                    << channel_layout
+                    << "for"
+                    << avStream.codecpar->channels
+                    << "channels";
+        }
     }
     return channel_layout;
 }
@@ -459,7 +463,7 @@ QStringList SoundSourceProviderFFmpeg::getSupportedFileTypes() const {
     }
 
     if (!disabledInputFormats.isEmpty()) {
-        kLogger.info().noquote()
+        kLogger.debug().noquote()
                 << "Disabling untested input formats:"
                 << disabledInputFormats.join(QStringLiteral(", "));
     }
