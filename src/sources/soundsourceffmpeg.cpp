@@ -56,7 +56,7 @@ constexpr SINT kMaxSamplesPerMP3Frame = 1152;
 const Logger kLogger("SoundSourceFFmpeg");
 
 int64_t getStreamStartTime(const AVStream& avStream) {
-    auto start_time = avStream.start_time;
+    int64_t start_time = avStream.start_time;
     if (start_time == AV_NOPTS_VALUE) {
         // This case is not unlikely, e.g. happens when decoding WAV files.
         switch (avStream.codecpar->codec_id) {
@@ -529,7 +529,11 @@ SoundSource::OpenResult SoundSourceFFmpeg::tryOpen(
     kLogger.debug()
             << "AVFormatContext"
             << "{ nb_streams" << m_pavInputFormatContext->nb_streams
-            << "| start_time" << m_pavInputFormatContext->start_time
+            << "| start_time"
+            << (m_pavInputFormatContext->start_time == AV_NOPTS_VALUE
+                               ? "AV_NOPTS_VALUE"
+                               : QString::number(
+                                         m_pavInputFormatContext->start_time))
             << "| duration" << m_pavInputFormatContext->duration
             << "| bit_rate" << m_pavInputFormatContext->bit_rate
             << "| packet_size" << m_pavInputFormatContext->packet_size
