@@ -106,6 +106,10 @@ VinylControlXwax::VinylControlXwax(UserSettingsPointer pConfig, const QString& g
         timecode = MIXXX_VINYL_PIONEERA_XWAX_NAME;
     } else if (strVinylType == MIXXX_VINYL_PIONEERB) {
         timecode = MIXXX_VINYL_PIONEERB_XWAX_NAME;
+    } else if (strVinylType == MIXXX_VINYL_ALGORIDDIMA) {
+        timecode = MIXXX_VINYL_ALGORIDDIMA_XWAX_NAME;
+    } else if (strVinylType == MIXXX_VINYL_ALGORIDDIMB) {
+        timecode = MIXXX_VINYL_ALGORIDDIMB_XWAX_NAME;
     } else {
         qDebug() << "Unknown vinyl type, defaulting to" << MIXXX_VINYL_DEFAULT_XWAX_NAME;
         timecode = MIXXX_VINYL_DEFAULT_XWAX_NAME;
