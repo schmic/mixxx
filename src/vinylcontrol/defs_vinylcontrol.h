@@ -17,7 +17,7 @@ constexpr int VINYL_STATUS_ERROR = 3;
 #define MIXXX_VINYL_TRAKTORSCRATCHMK2SIDEB "Traktor Scratch MK2 Vinyl, Side B (beta)"
 #define MIXXX_VINYL_TRAKTORSCRATCHMK2CD "Traktor Scratch MK2 CD (beta)"
 #define MIXXX_VINYL_MIXVIBESDVS "MixVibes DVS V2 Vinyl"
-#define MIXXX_VINYL_MIXVIBES7INCH "MixVibes 7 inch"
+#define MIXXX_VINYL_MIXVIBES7INCH "MixVibes 7\""
 #define MIXXX_VINYL_PIONEERA "Pioneer RekordBox DVS Control Vinyl, Side A"
 #define MIXXX_VINYL_PIONEERB "Pioneer RekordBox DVS Control Vinyl, Side B"
 #define MIXXX_VINYL_ALGORIDDIMA "Algoriddim djay PRO AI 12\", Side A"
