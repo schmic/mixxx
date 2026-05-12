@@ -52,6 +52,9 @@ DlgPrefVinyl::DlgPrefVinyl(
         box->addItem(MIXXX_VINYL_TRAKTORSCRATCHMK2CD);
         box->addItem(MIXXX_VINYL_TRAKTORSCRATCHMK2SIDEA);
         box->addItem(MIXXX_VINYL_TRAKTORSCRATCHMK2SIDEB);
+
+        // Use Serato as initial constructor value. Gets overwritten by config in slotUpdate()
+        box->setCurrentText(MIXXX_VINYL_SERATOCV02VINYLSIDEA);
         connect(box,
                 &QComboBox::currentTextChanged,
                 this,
@@ -166,17 +169,17 @@ void DlgPrefVinyl::slotHide() {
 
 void DlgPrefVinyl::slotResetToDefaults() {
     // Default to Serato Side A.
-    for (auto* box : std::as_const(m_vcTypeBoxes)) {
-        box->setCurrentIndex(0);
+    for (auto* pBox : std::as_const(m_vcTypeBoxes)) {
+        pBox->setCurrentText(MIXXX_VINYL_SERATOCV02VINYLSIDEA);
     }
 
     // Default to 33 RPM.
-    for (auto* box : std::as_const(m_vcTypeBoxes)) {
-        box->setCurrentIndex(0);
+    for (auto* pBox : std::as_const(m_vcSpeedBoxes)) {
+        pBox->setCurrentText(MIXXX_VINYL_SPEED_33);
     }
 
-    for (auto* box : std::as_const(m_vcLeadInBoxes)) {
-        box->setValue(MIXXX_VINYL_SERATOCV02VINYLSIDEA_LEADIN);
+    for (auto* pBox : std::as_const(m_vcLeadInBoxes)) {
+        pBox->setValue(MIXXX_VINYL_SERATOCV02VINYLSIDEA_LEADIN);
     }
 
     SignalQualityEnable->setChecked(true);
