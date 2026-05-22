@@ -65,15 +65,14 @@ bool WaveformRenderBeat::preprocessInner() {
     const bool splitStemTracks = isStemTrack && WaveformWidgetFactory::isCreated() &&
             WaveformWidgetFactory::instance()->isStemSplitTracks();
 
-    auto positionType = m_isSlipRenderer ? ::WaveformRendererAbstract::Slip
-                                         : ::WaveformRendererAbstract::Play;
-
+    const double trackSamples = m_waveformRenderer->getTrackSamples();
+    if (trackSamples <= 0.0) {
+        return false;
+    }
     mixxx::BeatsPointer trackBeats = trackInfo->getBeats();
     if (!trackBeats) {
         return false;
     }
-
-    int downbeatLength = m_waveformRenderer->getDownbeatLength();
 
 #ifndef __SCENEGRAPH__
     int alpha = m_waveformRenderer->getBeatGridAlpha();
@@ -91,11 +90,8 @@ bool WaveformRenderBeat::preprocessInner() {
 
     const float devicePixelRatio = m_waveformRenderer->getDevicePixelRatio();
 
-    const double trackSamples = m_waveformRenderer->getTrackSamples();
-    if (trackSamples <= 0.0) {
-        return false;
-    }
-
+    auto positionType = m_isSlipRenderer ? ::WaveformRendererAbstract::Slip
+                                         : ::WaveformRendererAbstract::Play;
     const double firstDisplayedPosition =
             m_waveformRenderer->getFirstDisplayedPosition(positionType);
     const double lastDisplayedPosition =
@@ -145,6 +141,10 @@ bool WaveformRenderBeat::preprocessInner() {
             ? rendererBreadth / static_cast<float>(mixxx::kMaxSupportedStems)
             : rendererBreadth;
 
+    auto* pWaveformWidgetFactory = WaveformWidgetFactory::instance();
+    bool downbeatsEnabled = pWaveformWidgetFactory->getDownbeatsEnabled();
+    int downbeatDistance = pWaveformWidgetFactory->getDownbeatDistance();
+
     for (auto it = trackBeats->iteratorFrom(startPosition);
             it != trackBeats->cend() && *it <= endPosition;
             ++it) {
@@ -158,8 +158,8 @@ bool WaveformRenderBeat::preprocessInner() {
         const float x1 = static_cast<float>(xBeatPoint);
         const float x2 = x1 + 1.f;
 
-        const bool isDownbeat = downbeatLength &&
-                std::distance(firstBeat, it) % downbeatLength == 0;
+        const bool isDownbeat = downbeatsEnabled &&
+                std::distance(firstBeat, it) % downbeatDistance == 0;
         const QVector4D color = isDownbeat
                 ? QVector4D(downbeat_r, downbeat_g, downbeat_b, downbeat_alpha)
                 : QVector4D(beat_r, beat_g, beat_b, beat_alpha);
