@@ -18,3 +18,20 @@ res/          Resources (controllers/ JS/XML, skins/, qml/)
 cmake/        CMake modules
 tools/        Python helper scripts
 ```
+
+## QML Skins
+
+Before changing QML skin discovery, startup, manifests, shared QML controls, or
+`res/skins/LateNightQML`, read [QML_SKIN.md](QML_SKIN.md). Keep that document in
+sync with behavioral or architectural changes.
+
+Important boundaries:
+
+- A configured QML skin is loaded with `--developer`; `--new-ui` is the separate
+  standalone QML UI and must not be used as an equivalent test path.
+- `res/skins/LateNightQML` is the current experimental example.
+- `Mixxx` and `Mixxx.Controls` are named QML modules. Relative imports from
+  `res/qml` depend on the bundled source layout and are not portable to a user
+  skin directory.
+- QML skin selection crosses the QWidget/QML application startup boundary and
+  requires a restart. Preserve profile-safety behavior when editing that path.
