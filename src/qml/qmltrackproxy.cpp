@@ -181,6 +181,11 @@ PROPERTY_IMPL(QString, trackTotal, getTrackTotal, setTrackTotal)
 PROPERTY_IMPL(QString, comment, getComment, setComment)
 PROPERTY_IMPL(QString, keyText, getKeyText, setKeyText)
 
+double QmlTrackProxy::getNumericKey() const {
+    const TrackPointer pTrack = m_pTrack;
+    return pTrack ? KeyUtils::keyToNumericValue(pTrack->getKey()) : 0;
+}
+
 QColor QmlTrackProxy::getColor() const {
     if (m_pTrack == nullptr) {
         return QColor();

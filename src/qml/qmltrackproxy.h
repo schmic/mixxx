@@ -35,6 +35,7 @@ class QmlTrackProxy : public QObject {
     Q_PROPERTY(QString trackTotal READ getTrackTotal WRITE setTrackTotal NOTIFY trackTotalChanged)
     Q_PROPERTY(QString comment READ getComment WRITE setComment NOTIFY commentChanged)
     Q_PROPERTY(QString keyText READ getKeyText WRITE setKeyText NOTIFY keyTextChanged)
+    Q_PROPERTY(double numericKey READ getNumericKey NOTIFY keyTextChanged)
     Q_PROPERTY(QColor color READ getColor WRITE setColor NOTIFY colorChanged)
     Q_PROPERTY(double duration READ getDuration NOTIFY durationChanged)
     Q_PROPERTY(int sampleRate READ getSampleRate NOTIFY sampleRateChanged)
@@ -66,6 +67,7 @@ class QmlTrackProxy : public QObject {
     QString getTrackTotal() const;
     QString getComment() const;
     QString getKeyText() const;
+    double getNumericKey() const;
     QColor getColor() const;
     double getDuration() const;
     int getSampleRate() const;
