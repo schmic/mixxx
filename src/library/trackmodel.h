@@ -20,6 +20,10 @@ class TrackModel {
     static constexpr int kDataExportRole = Qt::UserRole + 2;
     // This role provides the tuning frequency in Hz
     static constexpr int kTuningFrequencyRole = Qt::UserRole + 3;
+    // Bit mask of main decks that have this track loaded. Bit 0 is deck 1.
+    static constexpr int kLoadedDeckMaskRole = Qt::UserRole + 4;
+    // True if this track is loaded in any preview deck.
+    static constexpr int kPreviewDeckLoadedRole = Qt::UserRole + 5;
 
     TrackModel(const QSqlDatabase& db,
             const char* settingsNamespace)

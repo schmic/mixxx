@@ -29,6 +29,8 @@ const QHash<int, QByteArray> kRoleNames = {
         {QmlLibraryTrackListModel::Track, "track"},
         {QmlLibraryTrackListModel::FileURL, "file_url"},
         {QmlLibraryTrackListModel::CoverArt, "cover_art"},
+        {QmlLibraryTrackListModel::LoadedDeckMask, "loaded_deck_mask"},
+        {QmlLibraryTrackListModel::PreviewDeckLoaded, "preview_deck_loaded"},
 };
 
 QColor colorFromRgbCode(double colorValue) {
@@ -86,6 +88,9 @@ QVariant QmlLibraryTrackListModel::data(const QModelIndex& proxyIndex, int role)
     const auto& pColumn = m_columns[columnIdx];
 
     switch (role) {
+    case LoadedDeckMask:
+    case PreviewDeckLoaded:
+        return QIdentityProxyModel::data(proxyIndex.siblingAtColumn(0), role);
     case Track: {
         if (pTrackModel == nullptr) {
             return {};

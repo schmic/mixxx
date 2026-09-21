@@ -115,6 +115,11 @@ class WTrackTableView : public WLibraryTableView {
     QColor getTrackMissingColor() const {
         return m_trackMissingColor;
     }
+    // Color for left-edge markers of tracks loaded in a main deck. Default: blue.
+    static constexpr QColor kDefaultLoadedTrackMarkerColor = QColor(0x42, 0xa5, 0xf5);
+    Q_PROPERTY(QColor loadedTrackMarkerColor
+                    MEMBER m_loadedTrackMarkerColor
+                            DESIGNABLE true);
     // Color for the track drop indicator line. Default: red
     static constexpr QColor kDefaultDropIndicatorColor = QColor(0xff, 0x00, 0x00);
     Q_PROPERTY(QColor dropIndicatorColor
@@ -204,6 +209,7 @@ class WTrackTableView : public WLibraryTableView {
     QColor m_focusBorderColor;
     QColor m_trackPlayedColor;
     QColor m_trackMissingColor;
+    QColor m_loadedTrackMarkerColor;
     QColor m_dropIndicatorColor;
     bool m_sorting;
 

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <QSignalSpy>
 #include <QTest>
 #include <gsl/pointers>
 
@@ -11,6 +12,7 @@
 #include "engine/enginemixer.h"
 #include "library/coverartcache.h"
 #include "library/library.h"
+#include "library/librarytablemodel.h"
 #include "library/trackcollectionmanager.h"
 #include "mixer/basetrackplayer.h"
 #include "mixer/deck.h"
@@ -278,4 +280,38 @@ TEST_F(PlayerManagerTest, UnReplaceTest) {
     // First track should be reloaded
     ASSERT_NE(nullptr, deck1->getLoadedTrack());
     ASSERT_EQ(testId1, deck1->getLoadedTrack()->getId());
+}
+
+TEST_F(PlayerManagerTest, LoadedDeckMaskUpdatesTrackRows) {
+    auto pTrack1 = getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest1));
+    auto pTrack2 = getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest2));
+    ASSERT_NE(nullptr, pTrack1);
+    ASSERT_NE(nullptr, pTrack2);
+
+    auto* pModel = m_pLibrary->trackTableModel();
+    pModel->select();
+    const auto rows = pModel->getTrackRows(pTrack1->getId());
+    ASSERT_FALSE(rows.isEmpty());
+    const auto index = pModel->index(rows.first(), 0);
+    QSignalSpy dataChangedSpy(pModel, &QAbstractItemModel::dataChanged);
+
+    PlayerInfo::instance().setTrackInfo("[Channel1]", pTrack1);
+    EXPECT_EQ(1U, index.data(TrackModel::kLoadedDeckMaskRole).toUInt());
+    ASSERT_EQ(1, dataChangedSpy.count());
+
+    PlayerInfo::instance().setTrackInfo("[Channel2]", pTrack1);
+    EXPECT_EQ(3U, index.data(TrackModel::kLoadedDeckMaskRole).toUInt());
+    ASSERT_EQ(2, dataChangedSpy.count());
+
+    PlayerInfo::instance().setTrackInfo("[Channel1]", pTrack2);
+    EXPECT_EQ(2U, index.data(TrackModel::kLoadedDeckMaskRole).toUInt());
+    ASSERT_EQ(4, dataChangedSpy.count());
+
+    PlayerInfo::instance().setTrackInfo("[Sampler1]", pTrack1);
+    EXPECT_EQ(2U, index.data(TrackModel::kLoadedDeckMaskRole).toUInt());
+    EXPECT_EQ(4, dataChangedSpy.count());
+
+    PlayerInfo::instance().setTrackInfo("[PreviewDeck1]", pTrack1);
+    EXPECT_TRUE(index.data(TrackModel::kPreviewDeckLoadedRole).toBool());
+    EXPECT_EQ(5, dataChangedSpy.count());
 }

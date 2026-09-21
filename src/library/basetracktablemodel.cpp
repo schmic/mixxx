@@ -5,6 +5,7 @@
 #include <QMimeData>
 #include <QScreen>
 #include <QtGlobal>
+#include <algorithm>
 
 #include "base/Pitch.h"
 #include "library/coverartcache.h"
@@ -34,6 +35,7 @@
 #include "util/color/predefinedcolorpalettes.h"
 #include "util/datetime.h"
 #include "util/db/sqlite.h"
+#include "util/defs.h"
 #include "util/logger.h"
 #include "widget/wlibrary.h"
 #include "widget/wtracktableview.h"
@@ -414,7 +416,11 @@ QVariant BaseTrackTableModel::data(
         return QVariant();
     }
 
-    if (role == Qt::BackgroundRole) {
+    if (role == TrackModel::kLoadedDeckMaskRole) {
+        return loadedDeckMask(getTrack(index));
+    } else if (role == TrackModel::kPreviewDeckLoadedRole) {
+        return isLoadedInPreviewDeck(getTrack(index));
+    } else if (role == Qt::BackgroundRole) {
         const auto rgbColorValue = rawSiblingValue(
                 index,
                 ColumnCache::COLUMN_LIBRARYTABLE_COLOR);
@@ -1103,8 +1109,10 @@ void BaseTrackTableModel::slotTrackChanged(
         const QString& group,
         TrackPointer pNewTrack,
         TrackPointer pOldTrack) {
-    Q_UNUSED(pOldTrack);
-    if (group == m_previewDeckGroup) {
+    if (PlayerManager::isDeckGroup(group)) {
+        refreshLoadedTrackRows(pOldTrack);
+        refreshLoadedTrackRows(pNewTrack);
+    } else if (group == m_previewDeckGroup) {
         // If there was a previously loaded track, refresh its rows so the
         // preview state will update.
         if (m_previewDeckTrackId.isValid()) {
@@ -1118,6 +1126,51 @@ void BaseTrackTableModel::slotTrackChanged(
             }
         }
         m_previewDeckTrackId = doGetTrackId(pNewTrack);
+        refreshLoadedTrackRows(pOldTrack);
+        refreshLoadedTrackRows(pNewTrack);
+    }
+}
+
+quint32 BaseTrackTableModel::loadedDeckMask(const TrackPointer& pTrack) const {
+    quint32 mask = 0;
+    const auto loadedTracks = PlayerInfo::instance().getLoadedTracks();
+    for (auto it = loadedTracks.cbegin(); it != loadedTracks.cend(); ++it) {
+        int deckNumber;
+        if (it.value() == pTrack &&
+                PlayerManager::isDeckGroup(it.key(), &deckNumber) &&
+                deckNumber >= 1 && deckNumber <= kMaxNumberOfDecks) {
+            mask |= 1U << (deckNumber - 1);
+        }
+    }
+    return mask;
+}
+
+bool BaseTrackTableModel::isLoadedInPreviewDeck(const TrackPointer& pTrack) const {
+    const auto loadedTracks = PlayerInfo::instance().getLoadedTracks();
+    for (auto it = loadedTracks.cbegin(); it != loadedTracks.cend(); ++it) {
+        if (it.value() == pTrack && PlayerManager::isPreviewDeckGroup(it.key())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void BaseTrackTableModel::refreshLoadedTrackRows(const TrackPointer& pTrack) {
+    const TrackId trackId = doGetTrackId(pTrack);
+    if (!trackId.isValid()) {
+        return;
+    }
+    auto rows = getTrackRows(trackId);
+    std::sort(rows.begin(), rows.end());
+    const int lastColumn = columnCount() - 1;
+    if (lastColumn < 0) {
+        return;
+    }
+    for (const int row : rows) {
+        emit dataChanged(index(row, 0),
+                index(row, lastColumn),
+                {TrackModel::kLoadedDeckMaskRole,
+                        TrackModel::kPreviewDeckLoadedRole});
     }
 }
 

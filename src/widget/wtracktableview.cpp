@@ -6,6 +6,7 @@
 #include <QShortcut>
 #include <QStylePainter>
 #include <QUrl>
+#include <algorithm>
 
 #include "control/controlobject.h"
 #include "library/dao/trackschema.h"
@@ -53,6 +54,7 @@ WTrackTableView::WTrackTableView(QWidget* pParent,
           m_focusBorderColor(kDefaultFocusBorderColor),
           m_trackPlayedColor(kDefaultTrackPlayedColor),
           m_trackMissingColor(kDefaultTrackMissingColor),
+          m_loadedTrackMarkerColor(kDefaultLoadedTrackMarkerColor),
           m_dropIndicatorColor(kDefaultDropIndicatorColor),
           m_sorting(false),
           m_selectionChangedSinceLastGuiTick(true),
@@ -940,6 +942,21 @@ void WTrackTableView::dropEvent(QDropEvent * event) {
 
 void WTrackTableView::paintEvent(QPaintEvent* e) {
     QTableView::paintEvent(e);
+
+    if (model()) {
+        QPainter painter(viewport());
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(m_loadedTrackMarkerColor);
+        const int firstRow = rowAt(0);
+        const int lastRow = rowAt(viewport()->height() - 1);
+        for (int row = std::max(firstRow, 0);
+                lastRow >= 0 && row <= lastRow && row < model()->rowCount();
+                ++row) {
+            if (model()->index(row, 0).data(TrackModel::kLoadedDeckMaskRole).toUInt()) {
+                painter.drawRect(0, rowViewportPosition(row), 3, rowHeight(row));
+            }
+        }
+    }
 
     if (m_dropRow < 0) {
         return;

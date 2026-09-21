@@ -278,6 +278,10 @@ class BaseTrackTableModel : public QAbstractTableModel, public TrackModel {
             const QPixmap& pixmap);
 
   private:
+    void refreshLoadedTrackRows(const TrackPointer& pTrack);
+    quint32 loadedDeckMask(const TrackPointer& pTrack) const;
+    bool isLoadedInPreviewDeck(const TrackPointer& pTrack) const;
+
     QVariant rawSiblingValue(
             const QModelIndex& index,
             ColumnCache::Column siblingField) const;
