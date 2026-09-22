@@ -300,11 +300,20 @@ bool CmdlineArgs::parse(const QStringList& arguments, CmdlineArgs::ParseMode mod
                               "with the current one. We highly recommend "
                               "backing up your data if you do so.")
                     : QString());
+    const QCommandLineOption qmlSkin(QStringLiteral("new-ui-skin"),
+            forUserFeedback
+                    ? QCoreApplication::translate("CmdlineArgs",
+                              "Loads the highly unstable 3.0 Mixxx interface "
+                              "with the named QML skin. Has the same data "
+                              "corruption risk as '--new-ui'.")
+                    : QString(),
+            QStringLiteral("skin"));
     QCommandLineOption qmlDeprecated(
             QStringLiteral("qml"));
     qmlDeprecated.setFlags(QCommandLineOption::HiddenFromHelp);
     parser.addOption(qmlDeprecated);
     parser.addOption(qml);
+    parser.addOption(qmlSkin);
     const QCommandLineOption awareOfRisk(
             QStringLiteral("allow-dangerous-data-corruption-risk"),
             forUserFeedback
@@ -479,7 +488,8 @@ bool CmdlineArgs::parse(const QStringList& arguments, CmdlineArgs::ParseMode mod
     m_developer = parser.isSet(developer);
     m_stats = parser.isSet(stats);
 #ifdef MIXXX_USE_QML
-    m_qml = parser.isSet(qml);
+    m_qml = parser.isSet(qml) || parser.isSet(qmlSkin);
+    m_qmlSkinName = parser.value(qmlSkin);
     if (parser.isSet(qmlDeprecated)) {
         m_qml |= true;
         qWarning() << "The argument '--qml' is deprecated and will be soon "

@@ -53,6 +53,9 @@ class CmdlineArgs final {
     bool isQml() const {
         return m_qml;
     }
+    const QString& getQmlSkinName() const {
+        return m_qmlSkinName;
+    }
     bool isAwareOfRisk() const {
         return m_awareOfRisk;
     }
@@ -120,6 +123,7 @@ class CmdlineArgs final {
     bool m_stats;     // Enable stats collection
 #ifdef MIXXX_USE_QML
     bool m_qml;
+    QString m_qmlSkinName;
     bool m_awareOfRisk;
 #endif
     bool m_safeMode;

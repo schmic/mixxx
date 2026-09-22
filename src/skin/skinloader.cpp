@@ -253,10 +253,7 @@ SkinPointer SkinLoader::skinFromDirectory(const QDir& dir) const {
     }
 
 #ifdef MIXXX_USE_QML
-    // This getDeveloper() check is technically redundant because the callers
-    // (getSystemSkins, getSkin) already check it before scanning QML paths.
-    // Kept here for defense-in-depth in case future callers forget the guard.
-    if (CmdlineArgs::Instance().getDeveloper()) {
+    if (CmdlineArgs::Instance().getDeveloper() || CmdlineArgs::Instance().isQml()) {
         pSkin = qml::QmlSkin::fromDirectory(dir);
         if (pSkin && pSkin->isValid()) {
             return pSkin;
@@ -269,7 +266,7 @@ SkinPointer SkinLoader::skinFromDirectory(const QDir& dir) const {
 
 bool SkinLoader::isDeveloperOnlyQmlSkin([[maybe_unused]] const QString& skinName) const {
 #ifdef MIXXX_USE_QML
-    if (CmdlineArgs::Instance().getDeveloper()) {
+    if (CmdlineArgs::Instance().getDeveloper() || CmdlineArgs::Instance().isQml()) {
         return false;
     }
     const QList<QDir> skinSearchPaths = getSkinSearchPaths();

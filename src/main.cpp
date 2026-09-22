@@ -66,9 +66,17 @@ int runMixxx(MixxxApplication* pApp, const CmdlineArgs& args) {
 #ifdef MIXXX_USE_QML
     QString mainQmlFilePath;
     bool loadQml = args.isQml();
-    if (!loadQml && args.getDeveloper()) {
+    const bool useRequestedQmlSkin = loadQml && !args.getQmlSkinName().isEmpty();
+    if (useRequestedQmlSkin || (!loadQml && args.getDeveloper())) {
         mixxx::skin::SkinLoader skinLoader(pCoreServices->getSettings());
-        const mixxx::skin::SkinPointer pSkin = skinLoader.getConfiguredSkin();
+        const mixxx::skin::SkinPointer pSkin = useRequestedQmlSkin
+                ? skinLoader.getSkin(args.getQmlSkinName())
+                : skinLoader.getConfiguredSkin();
+        if (useRequestedQmlSkin && (!pSkin || pSkin->type() != mixxx::skin::SkinType::QML)) {
+            qCritical() << "Requested QML skin" << args.getQmlSkinName()
+                        << "was not found or is not a QML skin";
+            return kFatalErrorOnStartupExitCode;
+        }
         if (pSkin && pSkin->type() == mixxx::skin::SkinType::QML) {
             loadQml = true;
             mainQmlFilePath = pSkin->mainQmlFilePath();
