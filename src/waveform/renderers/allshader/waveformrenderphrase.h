@@ -1,8 +1,8 @@
 #pragma once
 
 #include <QColor>
+#include <optional>
 
-#include "audio/frame.h"
 #include "control/pollingcontrolproxy.h"
 #include "rendergraph/geometrynode.h"
 #include "track/beats.h"
@@ -14,53 +14,36 @@ class QDomNode;
 class SkinContext;
 
 namespace allshader {
-class WaveformRenderBeat;
+class WaveformRenderPhrase;
 } // namespace allshader
 
-class allshader::WaveformRenderBeat final
+class allshader::WaveformRenderPhrase final
         : public QObject,
           public ::WaveformRendererAbstract,
           public rendergraph::GeometryNode {
     Q_OBJECT
   public:
-    explicit WaveformRenderBeat(WaveformWidgetRenderer* waveformWidget,
+    explicit WaveformRenderPhrase(WaveformWidgetRenderer* waveformWidget,
             ::WaveformRendererAbstract::PositionSource type =
                     ::WaveformRendererAbstract::Play);
 
-    // Pure virtual from WaveformRendererAbstract, not used
     void draw(QPainter* painter, QPaintEvent* event) override final;
-
     void setup(const QDomNode& node, const SkinContext& skinContext) override;
-
     void onSetTrack() override;
-
-    // Virtuals for rendergraph::Node
     void preprocess() override;
 
-  public slots:
-    void setColor(const QColor& color) {
-        m_color = color;
-    }
-    void setDownbeatColor(const QColor& color) {
-        m_downbeatColor = color;
-    }
-    void slotBeatsUpdated();
-    void slotCuesUpdated();
+  private slots:
+    void updateFirstDownbeat();
 
   private:
-    void setFirstDownbeatMaybeInvalid();
-
-    QColor m_color;
-    QColor m_downbeatColor;
-    bool m_isSlipRenderer;
-    mixxx::BeatsPointer m_pTrackBeats;
-    // members for setting/caching the downbeat at intro_start_position
-    PollingControlProxy m_introStartPosCO;
-    std::optional<mixxx::Beats::ConstIterator> m_firstDownBeat;
-
-    TrackPointer m_pLoadedTrack;
-
     bool preprocessInner();
 
-    DISALLOW_COPY_AND_ASSIGN(WaveformRenderBeat);
+    QColor m_color;
+    bool m_isSlipRenderer;
+    PollingControlProxy m_introStartPosCO;
+    TrackPointer m_pLoadedTrack;
+    mixxx::BeatsPointer m_pTrackBeats;
+    std::optional<mixxx::Beats::ConstIterator> m_firstDownbeat;
+
+    DISALLOW_COPY_AND_ASSIGN(WaveformRenderPhrase);
 };
