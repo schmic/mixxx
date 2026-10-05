@@ -107,6 +107,11 @@ SetlogFeature::SetlogFeature(
 
     // initialized in a new generic slot(get new history playlist purpose)
     slotGetNewPlaylist();
+
+    connect(&PlayerInfo::instance(),
+            &PlayerInfo::currentPlayingTrackChanged,
+            this,
+            &SetlogFeature::slotPlayingTrackChanged);
 }
 
 SetlogFeature::~SetlogFeature() {
@@ -124,10 +129,6 @@ QVariant SetlogFeature::title() {
 void SetlogFeature::bindLibraryWidget(
         WLibrary* pLibraryWidget, KeyboardEventFilter* pKeyboard) {
     BasePlaylistFeature::bindLibraryWidget(pLibraryWidget, pKeyboard);
-    connect(&PlayerInfo::instance(),
-            &PlayerInfo::currentPlayingTrackChanged,
-            this,
-            &SetlogFeature::slotPlayingTrackChanged);
     m_pLibraryWidget = QPointer(pLibraryWidget);
 }
 

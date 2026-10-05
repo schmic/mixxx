@@ -10,8 +10,12 @@
 #include "engine/enginebuffer.h"
 #include "engine/enginemixer.h"
 #include "library/coverartcache.h"
+#include "library/dao/playlistdao.h"
 #include "library/library.h"
+#include "library/library_prefs.h"
+#include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
+#include "library/trackset/setlogfeature.h"
 #include "mixer/basetrackplayer.h"
 #include "mixer/deck.h"
 #include "mixer/playerinfo.h"
@@ -21,6 +25,7 @@
 #include "test/soundsourceproviderregistration.h"
 #include "track/track.h"
 #include "util/cmdlineargs.h"
+#include "widget/wlibrary.h"
 #ifdef __RUBBERBAND__
 #include "engine/bufferscalers/rubberbandworkerpool.h"
 #endif
@@ -278,4 +283,68 @@ TEST_F(PlayerManagerTest, UnReplaceTest) {
     // First track should be reloaded
     ASSERT_NE(nullptr, deck1->getLoadedTrack());
     ASSERT_EQ(testId1, deck1->getLoadedTrack()->getId());
+}
+
+TEST_F(PlayerManagerTest, RecordsPlayedTracksWithoutLibraryWidget) {
+    const auto pTrack1 = getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest1));
+    const auto pTrack2 = getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest2));
+    ASSERT_TRUE(pTrack1);
+    ASSERT_TRUE(pTrack2);
+    ASSERT_TRUE(pTrack1->getId().isValid());
+    ASSERT_TRUE(pTrack2->getId().isValid());
+    EXPECT_FALSE(pTrack1->getPlayCounter().isPlayed());
+    EXPECT_EQ(0, pTrack1->getPlayCounter().getTimesPlayed());
+    EXPECT_FALSE(pTrack1->getPlayCounter().getLastPlayedAt().isValid());
+
+    auto& playlistDao = m_pTrackCollectionManager->internalCollection()->getPlaylistDAO();
+    const auto historyPlaylists = playlistDao.getPlaylists(PlaylistDAO::PLHT_SET_LOG);
+    ASSERT_EQ(1, historyPlaylists.size());
+    const auto historyPlaylistId = historyPlaylists.first().first;
+    EXPECT_TRUE(playlistDao.getTrackIds(historyPlaylistId).isEmpty());
+
+    PlayerInfo::instance().currentPlayingTrackChanged(pTrack1);
+
+    const auto playCounter = pTrack1->getPlayCounter();
+    EXPECT_TRUE(playCounter.isPlayed());
+    EXPECT_EQ(1, playCounter.getTimesPlayed());
+    EXPECT_TRUE(playCounter.getLastPlayedAt().isValid());
+    EXPECT_EQ(QList<TrackId>{pTrack1->getId()},
+            playlistDao.getTrackIdsInPlaylistOrder(historyPlaylistId));
+
+    PlayerInfo::instance().currentPlayingTrackChanged(TrackPointer{});
+    PlayerInfo::instance().currentPlayingTrackChanged(pTrack1);
+    EXPECT_EQ(playCounter, pTrack1->getPlayCounter());
+    EXPECT_EQ(1, playlistDao.tracksInPlaylist(historyPlaylistId));
+
+    PlayerInfo::instance().currentPlayingTrackChanged(pTrack2);
+    PlayerInfo::instance().currentPlayingTrackChanged(pTrack1);
+    EXPECT_TRUE(pTrack2->getPlayCounter().isPlayed());
+    EXPECT_EQ(1, pTrack2->getPlayCounter().getTimesPlayed());
+    EXPECT_TRUE(pTrack2->getPlayCounter().getLastPlayedAt().isValid());
+    EXPECT_EQ(playCounter, pTrack1->getPlayCounter());
+    EXPECT_EQ((QList<TrackId>{pTrack1->getId(), pTrack2->getId()}),
+            playlistDao.getTrackIdsInPlaylistOrder(historyPlaylistId));
+}
+
+TEST_F(PlayerManagerTest, BindingLegacyLibraryDoesNotDuplicatePlayedTrackEvents) {
+    m_pConfig->setValue(mixxx::library::prefs::kHistoryTrackDuplicateDistanceConfigKey, 0);
+    auto* pSetlogFeature = m_pLibrary->findChild<SetlogFeature*>();
+    ASSERT_TRUE(pSetlogFeature);
+    WLibrary libraryWidget(nullptr);
+    pSetlogFeature->bindLibraryWidget(&libraryWidget, nullptr);
+
+    const auto pTrack = getOrAddTrackByLocation(getTestDir().filePath(kTrackLocationTest1));
+    ASSERT_TRUE(pTrack);
+    ASSERT_TRUE(pTrack->getId().isValid());
+
+    PlayerInfo::instance().currentPlayingTrackChanged(pTrack);
+
+    EXPECT_TRUE(pTrack->getPlayCounter().isPlayed());
+    EXPECT_EQ(1, pTrack->getPlayCounter().getTimesPlayed());
+    EXPECT_TRUE(pTrack->getPlayCounter().getLastPlayedAt().isValid());
+    auto& playlistDao = m_pTrackCollectionManager->internalCollection()->getPlaylistDAO();
+    const auto historyPlaylists = playlistDao.getPlaylists(PlaylistDAO::PLHT_SET_LOG);
+    ASSERT_EQ(1, historyPlaylists.size());
+    EXPECT_EQ(QList<TrackId>{pTrack->getId()},
+            playlistDao.getTrackIdsInPlaylistOrder(historyPlaylists.first().first));
 }
