@@ -131,6 +131,12 @@ bool AnalyzerKey::shouldAnalyze(TrackPointer pTrack) const {
     }
 
     const Keys keys = pTrack->getKeys();
+#ifdef MIXXX_RBL_ANALYSIS
+    if (m_keySettings.getKeyPluginId().isEmpty() &&
+            keys.getSubVersion() == QStringLiteral("analyzer=rbl-analysis-1")) {
+        return false;
+    }
+#endif
     if (keys.getGlobalKey() != mixxx::track::io::key::INVALID) {
         QString version = keys.getVersion();
         QString subVersion = keys.getSubVersion();

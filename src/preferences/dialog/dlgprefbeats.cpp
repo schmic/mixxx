@@ -19,6 +19,10 @@ DlgPrefBeats::DlgPrefBeats(QWidget* parent, UserSettingsPointer pConfig)
     for (const auto& info : std::as_const(m_availablePlugins)) {
         comboBoxBeatPlugin->addItem(info.name(), info.id());
     }
+#ifdef MIXXX_RBL_ANALYSIS
+    comboBoxBeatPlugin->addItem(tr("rbl-analysis (BPM, key, waveform)"),
+            QStringLiteral("rbl-analysis"));
+#endif
 
     slotUpdate();
 
@@ -104,7 +108,7 @@ void DlgPrefBeats::pluginSelected(int i) {
     if (i == -1) {
         return;
     }
-    m_selectedAnalyzerId = m_availablePlugins[i].id();
+    m_selectedAnalyzerId = comboBoxBeatPlugin->itemData(i).toString();
     updateGui();
 }
 
@@ -155,22 +159,32 @@ void DlgPrefBeats::updateGui() {
     }
 
     if (m_availablePlugins.size() > 0) {
-        bool found = false;
-        for (int i = 0; i < m_availablePlugins.size(); ++i) {
-            const auto& info = m_availablePlugins.at(i);
-            if (info.id() == m_selectedAnalyzerId) {
-                found = true;
-                comboBoxBeatPlugin->setCurrentIndex(i);
-                if (!m_availablePlugins[i].isConstantTempoSupported()) {
-                    checkBoxFixedTempo->setEnabled(false);
+#ifdef MIXXX_RBL_ANALYSIS
+        if (m_selectedAnalyzerId == QStringLiteral("rbl-analysis")) {
+            comboBoxBeatPlugin->setCurrentIndex(m_availablePlugins.size());
+            checkBoxFixedTempo->setEnabled(false);
+            checkBoxFastAnalysis->setEnabled(false);
+        } else {
+#endif
+            bool found = false;
+            for (int i = 0; i < m_availablePlugins.size(); ++i) {
+                const auto& info = m_availablePlugins.at(i);
+                if (info.id() == m_selectedAnalyzerId) {
+                    found = true;
+                    comboBoxBeatPlugin->setCurrentIndex(i);
+                    if (!m_availablePlugins[i].isConstantTempoSupported()) {
+                        checkBoxFixedTempo->setEnabled(false);
+                    }
+                    break;
                 }
-                break;
             }
+            if (!found) {
+                comboBoxBeatPlugin->setCurrentIndex(0);
+                m_selectedAnalyzerId = m_availablePlugins[0].id();
+            }
+#ifdef MIXXX_RBL_ANALYSIS
         }
-        if (!found) {
-            comboBoxBeatPlugin->setCurrentIndex(0);
-            m_selectedAnalyzerId = m_availablePlugins[0].id();
-        }
+#endif
     }
 
     checkBoxFixedTempo->setChecked(m_bFixedTempoEnabled);

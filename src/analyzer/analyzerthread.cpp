@@ -8,6 +8,7 @@
 #include "analyzer/analyzerkey.h"
 #include "analyzer/analyzersilence.h"
 #include "analyzer/analyzerwaveform.h"
+#include "analyzer/rbl/rblanalyzer.h"
 #include "analyzer/constants.h"
 #include "library/dao/analysisdao.h"
 #include "moc_analyzerthread.cpp"
@@ -136,6 +137,25 @@ void AnalyzerThread::doRun() {
                     << m_currentTrack->getTrack()->getLocation();
             emitDoneProgress(kAnalyzerProgressUnknown);
             continue;
+        }
+
+        const auto rblEligibility = mixxx::rbl::selected(m_pConfig)
+                ? mixxx::rbl::eligibility(*m_currentTrack,
+                          m_pConfig,
+                          dbConnectionPooler.isPooling()
+                                  ? mixxx::DbConnectionPooled(m_dbConnectionPool)
+                                  : QSqlDatabase(),
+                          (m_modeFlags & AnalyzerModeFlags::WithWaveform) != 0,
+                          (m_modeFlags & AnalyzerModeFlags::WithBeats) != 0)
+                : mixxx::rbl::Eligibility{};
+        if (rblEligibility.beats || rblEligibility.key || rblEligibility.waveform) {
+            emitBusyProgress(kAnalyzerProgressNone);
+            mixxx::rbl::analyzeAndStore(*m_currentTrack,
+                    m_pConfig,
+                    dbConnectionPooler.isPooling()
+                            ? mixxx::DbConnectionPooled(m_dbConnectionPool)
+                            : QSqlDatabase(),
+                    rblEligibility);
         }
 
         // If we have a non-even multi channel audio source (mono or )
