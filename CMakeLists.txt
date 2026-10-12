@@ -358,6 +358,33 @@ option(QT6 "Build with Qt6" ON)
 # Once this is fixed we can revert the commit introducing this.
 option(QML "Build with QML" OFF)
 
+option(RBL_ANALYSIS "Enable optional rbl-audio/rbl-analysis offline analyzer" OFF)
+if(RBL_ANALYSIS)
+  find_program(RBL_CARGO_EXECUTABLE cargo REQUIRED)
+  set(RBL_BRIDGE_MANIFEST "${CMAKE_CURRENT_SOURCE_DIR}/src/analyzer/rbl/bridge/Cargo.toml")
+  set(RBL_BRIDGE_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rbl-bridge")
+  if(WIN32)
+    set(RBL_BRIDGE_LIB "${RBL_BRIDGE_TARGET_DIR}/release/mixxx_rbl_analysis_bridge.lib")
+  else()
+    set(RBL_BRIDGE_LIB "${RBL_BRIDGE_TARGET_DIR}/release/libmixxx_rbl_analysis_bridge.a")
+  endif()
+  file(GLOB_RECURSE RBL_BRIDGE_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/analyzer/rbl/bridge/src/*.rs")
+  add_custom_command(
+    OUTPUT "${RBL_BRIDGE_LIB}"
+    COMMAND "${CMAKE_COMMAND}" -E env "CARGO_TARGET_DIR=${RBL_BRIDGE_TARGET_DIR}"
+      "${RBL_CARGO_EXECUTABLE}" build --release --locked --manifest-path "${RBL_BRIDGE_MANIFEST}"
+    DEPENDS "${RBL_BRIDGE_MANIFEST}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/analyzer/rbl/bridge/Cargo.lock"
+      ${RBL_BRIDGE_SOURCES}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    VERBATIM
+  )
+  add_custom_target(rbl-analysis-bridge DEPENDS "${RBL_BRIDGE_LIB}")
+  add_library(rbl-analysis-bridge-lib STATIC IMPORTED GLOBAL)
+  set_target_properties(rbl-analysis-bridge-lib PROPERTIES IMPORTED_LOCATION "${RBL_BRIDGE_LIB}")
+  add_dependencies(rbl-analysis-bridge-lib rbl-analysis-bridge)
+endif()
 if(QT6)
   set(QOPENGL ON CACHE INTERNAL "Forced ON because QT6=ON")
 else()
@@ -1129,6 +1156,7 @@ add_library(
   src/analyzer/analyzerthread.cpp
   src/analyzer/analyzertrack.cpp
   src/analyzer/analyzerwaveform.cpp
+  src/analyzer/rbl/rblanalyzer.cpp
   src/analyzer/plugins/analyzerqueenmarybeats.cpp
   src/analyzer/plugins/analyzerqueenmarykey.cpp
   src/analyzer/plugins/analyzersoundtouchbeats.cpp
@@ -1767,6 +1795,13 @@ add_library(
   src/widget/wwidgetgroup.cpp
   src/widget/wwidgetstack.cpp
 )
+if(RBL_ANALYSIS)
+  target_compile_definitions(mixxx-lib PRIVATE MIXXX_RBL_ANALYSIS)
+  target_link_libraries(mixxx-lib PRIVATE rbl-analysis-bridge-lib)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(mixxx-lib PRIVATE dl m)
+  endif()
+endif()
 set(MIXXX_COMMON_PRECOMPILED_HEADER src/util/assert.h)
 set(
   MIXXX_LIB_PRECOMPILED_HEADER

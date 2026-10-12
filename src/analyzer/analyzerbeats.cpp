@@ -160,6 +160,12 @@ bool AnalyzerBeats::shouldAnalyze(TrackPointer pTrack) const {
     }
 
     QString subVersion = pBeats->getSubVersion();
+#ifdef MIXXX_RBL_ANALYSIS
+    if (m_bpmSettings.getBeatPluginId() == QStringLiteral("rbl-analysis") &&
+            subVersion == QStringLiteral("rbl-analysis-1")) {
+        return false;
+    }
+#endif
     if (subVersion == mixxx::rekordboxconstants::beatsSubversion) {
         return m_bPreferencesReanalyzeImported;
     }

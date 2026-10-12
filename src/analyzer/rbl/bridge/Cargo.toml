@@ -1,0 +1,12 @@
+[package]
+name = "mixxx-rbl-analysis-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+rbl-analysis = { git = "https://github.com/schmic/rbxport.git", rev = "8a66b49a6700a50f0b4c95e54129350344bfcd01" }
+rbl-audio = { git = "https://github.com/schmic/rbxport.git", rev = "8a66b49a6700a50f0b4c95e54129350344bfcd01" }
