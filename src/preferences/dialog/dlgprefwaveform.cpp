@@ -95,6 +95,9 @@ DlgPrefWaveform::DlgPrefWaveform(
     // Adopt tr string from first GLSL hint
     requiresGLSLLabel2->setText(requiresGLSLLabel->text());
 
+    downbeatDistanceSpinBox->setMinimum(WaveformWidgetFactory::downbeatDistanceMin());
+    downbeatDistanceSpinBox->setMaximum(WaveformWidgetFactory::downbeatDistanceMax());
+
     // The GUI is not fully setup so connecting signals before calling
     // slotUpdate can generate rebootMixxxView calls.
     // TODO(XXX): Improve this awkwardness.
@@ -245,6 +248,14 @@ DlgPrefWaveform::DlgPrefWaveform(
             QOverload<int>::of(&QComboBox::currentIndexChanged),
             this,
             &DlgPrefWaveform::slotStemDisplayMode);
+    connect(enableDownBeatCheckBox,
+            &QCheckBox::clicked,
+            this,
+            &DlgPrefWaveform::slotSetDownbeatEnabled);
+    connect(downbeatDistanceSpinBox,
+            &QSpinBox::valueChanged,
+            this,
+            &DlgPrefWaveform::slotSetDownbeatDistance);
 
     setScrollSafeGuardForAllInputWidgets(this);
 }
@@ -345,6 +356,13 @@ void DlgPrefWaveform::slotUpdate() {
     enableWaveformGenerationWithAnalysis->setChecked(
         waveformSettings.waveformGenerationWithAnalysisEnabled());
     calculateCachedWaveformDiskUsage();
+
+    bool downbeatsEnabled = pFactory->getDownbeatsEnabled();
+    enableDownBeatCheckBox->setChecked(downbeatsEnabled);
+    downbeatDistanceLabel->setEnabled(downbeatsEnabled);
+    downbeatDistanceSpinBox->setEnabled(downbeatsEnabled);
+    int downbeatDistance = pFactory->getDownbeatDistance();
+    downbeatDistanceSpinBox->setValue(downbeatDistance);
 }
 
 void DlgPrefWaveform::slotApply() {
@@ -412,6 +430,9 @@ void DlgPrefWaveform::slotResetToDefaults() {
     playMarkerPositionSlider->setValue(50);
 
     stemDisplayModeComboBox->setCurrentIndex(0);
+
+    enableDownBeatCheckBox->setChecked(WaveformWidgetFactory::downbeatsEnabledDefault());
+    downbeatDistanceSpinBox->setValue(WaveformWidgetFactory::downbeatDistanceDefault());
 }
 
 void DlgPrefWaveform::slotSetFrameRate(int frameRate) {
@@ -660,6 +681,17 @@ void DlgPrefWaveform::slotClearCachedWaveforms() {
 void DlgPrefWaveform::slotSetBeatGridAlpha(int alpha) {
     m_pConfig->setValue(ConfigKey(kWaveformGroup, QStringLiteral("beatGridAlpha")), alpha);
     WaveformWidgetFactory::instance()->setDisplayBeatGridAlpha(alpha);
+}
+
+void DlgPrefWaveform::slotSetDownbeatEnabled(bool enabled) {
+    slotSetDownbeatDistance(downbeatDistanceSpinBox->value());
+    WaveformWidgetFactory::instance()->setDownbeatsEnabled(enabled);
+    downbeatDistanceLabel->setEnabled(enabled);
+    downbeatDistanceSpinBox->setEnabled(enabled);
+}
+
+void DlgPrefWaveform::slotSetDownbeatDistance(int downbeatDistance) {
+    WaveformWidgetFactory::instance()->setDownbeatDistance(downbeatDistance);
 }
 
 void DlgPrefWaveform::slotSetPlayMarkerPosition(int position) {
