@@ -36,12 +36,6 @@ or on behalf of a user.
 All Issues, Bug Reports, and Feature Requests must be explicitly reviewed, approved, and submitted by
 the human user themselves.
 
-### AI-Generated Text Must Carry a Disclaimer
-
-Any text (PR description, commit message body, code comments, documentation) that was written
-autonomously by an AI Agent **must** be framed with an disclaimer that the text is autonomously generated
-by the AI Agent, at both the start and the end of that text block.
-
 ## Key Architecture
 
 - **ControlObject/ControlProxy**: `[Group], key_name` inter-component communication.
@@ -56,3 +50,10 @@ res/          Resources (controllers/ JS/XML, skins/, qml/)
 cmake/        CMake modules
 tools/        Python helper scripts
 ```
+
+## Additional required reading
+
+Before working in this repository, read [MIXXXOS.md](MIXXXOS.md) and
+[MIXXXOS_TODOS.md](MIXXXOS_TODOS.md) in full. These are project instructions
+and planning context for all agents, including OpenCode and Codex; follow them
+alongside this file and any applicable nested `AGENTS.md`.

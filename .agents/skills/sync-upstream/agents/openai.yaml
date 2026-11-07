@@ -1,0 +1,6 @@
+interface:
+  display_name: "Sync Mixxx upstream"
+  short_description: "Rebase MixxxOS main onto upstream with validation"
+  default_prompt: "Use $sync-upstream to synchronize this MixxxOS fork with upstream."
+policy:
+  allow_implicit_invocation: false
