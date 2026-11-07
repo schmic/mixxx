@@ -1,0 +1,8 @@
+[tasks.configure]
+description = "Configure Mixxx with QML and tests"
+run = "cmake -S . -B build -DQML=ON -DBUILD_TESTING=ON"
+
+[tasks.build]
+description = "Configure and build Mixxx"
+depends = ["configure"]
+run = "cmake --build build --parallel 12"

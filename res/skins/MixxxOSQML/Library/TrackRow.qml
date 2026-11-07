@@ -1,0 +1,343 @@
+pragma ComponentBehavior: Bound
+
+import "../Theme"
+import Mixxx 1.0 as Mixxx
+import QtQuick
+import QtQuick.Layouts
+
+Item {
+    id: root
+
+    readonly property real actionWidth: 192
+    required property int bpmColumnWidth
+    required property int commentColumnWidth
+    required property url cover_art
+    required property string displayBpm
+    required property string displayKey
+    required property string displayLastPlayed
+    property real dragStartX: 0
+    required property int durationColumnWidth
+    required property url file_url
+    required property var foregroundColor
+    required property int genreColumnWidth
+    readonly property bool hasForegroundColor: root.foregroundColor !== undefined && root.foregroundColor !== null
+    required property int index
+    required property int keyColumnWidth
+    required property int lastPlayedColumnWidth
+    required property bool loadEnabled
+    required property int loaded_deck_mask
+    required property int numericKey
+    property bool menuOpen: false
+    property bool previewHoldTriggered: false
+    required property bool previewEnabled
+    required property bool preview_deck_loaded
+    required property int ratingColumnWidth
+    property bool selected: false
+    required property var track
+
+    signal loadNextRequested
+    signal loadRequested(string group)
+    signal menuClosed(var row)
+    signal menuOpenRequested(var row)
+    signal previewRequested(var row)
+    signal selectRequested(var row)
+
+    function closeMenu() {
+        root.menuOpen = false;
+        rowContent.x = 0;
+        root.menuClosed(root);
+    }
+    function durationText(seconds) {
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+            return "--:--";
+        }
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        return minutes + ":" + remainingSeconds.toString().padStart(2, "0");
+    }
+    function openMenu() {
+        root.menuOpenRequested(root);
+        root.menuOpen = true;
+        rowContent.x = -root.actionWidth;
+    }
+    function keyColor(numericKey) {
+        const openKeyNumber = Mixxx.KeyUtils.keyToOpenKeyNumber(numericKey);
+        const palette = Mixxx.Config.keyColorPalette;
+        if (!Mixxx.Config.configKeyColorsEnabled || openKeyNumber <= 0 ||
+                !palette || palette.length < openKeyNumber) {
+            return TouchTheme.keyText;
+        }
+        return palette[openKeyNumber - 1];
+    }
+    readonly property color loadedMarkerColor: {
+        if ((root.loaded_deck_mask & 1) !== 0) {
+            return TouchTheme.deck1Accent;
+        }
+        if ((root.loaded_deck_mask & 2) !== 0) {
+            return TouchTheme.deck2Accent;
+        }
+        if (root.preview_deck_loaded) {
+            return TouchTheme.previewAccent;
+        }
+        return TouchTheme.libraryRowSelectedBackground;
+    }
+
+    clip: true
+    height: 56
+
+    ListView.onPooled: root.closeMenu()
+    ListView.onReused: root.closeMenu()
+
+    Row {
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        anchors.top: parent.top
+        width: root.actionWidth
+
+        SwipeLoadButton {
+            accentColor: TouchTheme.deck1Accent
+            enabled: root.loadEnabled
+            height: parent.height
+            label: qsTr("LOAD 1")
+            width: root.actionWidth / 2
+
+            onTriggered: {
+                root.loadRequested("[Channel1]");
+                root.closeMenu();
+            }
+        }
+        SwipeLoadButton {
+            accentColor: TouchTheme.deck2Accent
+            enabled: root.loadEnabled
+            height: parent.height
+            label: qsTr("LOAD 2")
+            width: root.actionWidth / 2
+
+            onTriggered: {
+                root.loadRequested("[Channel2]");
+                root.closeMenu();
+            }
+        }
+    }
+    Rectangle {
+        id: rowContent
+
+        color: root.selected ? TouchTheme.libraryRowSelectedBackground : root.index % 2 === 0 ? TouchTheme.libraryRowBackground : TouchTheme.libraryRowAlternateBackground
+        height: parent.height
+        width: parent.width
+        x: 0
+
+        Behavior on x {
+            enabled: !swipeDragHandler.active
+
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            color: TouchTheme.border
+            height: 1
+        }
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.top: parent.top
+            color: root.loadedMarkerColor
+            width: 3
+        }
+        Rectangle {
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            color: TouchTheme.controlBackground
+            height: 44
+            width: 44
+
+            Image {
+                anchors.fill: parent
+                asynchronous: true
+                fillMode: Image.PreserveAspectCrop
+                source: root.cover_art
+                visible: status === Image.Ready
+            }
+        }
+        RowLayout {
+            anchors.left: parent.left
+            anchors.leftMargin: 64
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 12
+
+            Column {
+                Layout.fillWidth: true
+                spacing: 1
+
+                Text {
+                    color: root.hasForegroundColor ? root.foregroundColor : TouchTheme.primaryText
+                    elide: Text.ElideRight
+                    font.family: TouchTheme.fontFamily
+                    font.pixelSize: 16
+                    font.weight: Font.DemiBold
+                    text: root.track?.title || qsTr("Untitled track")
+                    width: parent.width
+                }
+                Text {
+                    color: root.hasForegroundColor ? root.foregroundColor : TouchTheme.secondaryText
+                    elide: Text.ElideRight
+                    font.family: TouchTheme.fontFamily
+                    font.pixelSize: 13
+                    text: root.track?.artist || qsTr("Unknown artist")
+                    width: parent.width
+                }
+            }
+            MetadataValue {
+                Layout.preferredWidth: root.genreColumnWidth
+                text: root.track?.genre || "--"
+            }
+            MetadataValue {
+                Layout.preferredWidth: root.commentColumnWidth
+                text: root.track?.comment || "--"
+            }
+            MetadataValue {
+                Layout.preferredWidth: root.bpmColumnWidth
+                text: root.displayBpm || "--"
+            }
+            MetadataValue {
+                Layout.preferredWidth: root.ratingColumnWidth
+                text: root.track && root.track.stars > 0 ? root.track.stars + "/5" : "--"
+            }
+            MetadataValue {
+                Layout.preferredWidth: root.keyColumnWidth
+                color: root.hasForegroundColor ? root.foregroundColor : root.keyColor(root.numericKey)
+                text: root.displayKey || "--"
+            }
+            MetadataValue {
+                Layout.preferredWidth: root.durationColumnWidth
+                horizontalAlignment: Text.AlignRight
+                text: root.durationText(root.track?.duration || 0)
+            }
+            MetadataValue {
+                Layout.preferredWidth: root.lastPlayedColumnWidth
+                text: root.displayLastPlayed || "--"
+            }
+        }
+        TapHandler {
+            acceptedButtons: Qt.LeftButton
+            longPressThreshold: 0.5
+
+            onDoubleTapped: {
+                if (root.previewHoldTriggered) {
+                    root.previewHoldTriggered = false;
+                    return;
+                }
+                if (root.menuOpen) {
+                    root.closeMenu();
+                    return;
+                }
+                root.selectRequested(root);
+                if (root.loadEnabled) {
+                    root.loadNextRequested();
+                }
+            }
+            onLongPressed: {
+                if (!root.previewEnabled) {
+                    return;
+                }
+                root.previewHoldTriggered = true;
+                if (root.menuOpen) {
+                    root.closeMenu();
+                }
+                root.previewRequested(root);
+            }
+            onPressedChanged: {
+                if (pressed) {
+                    root.previewHoldTriggered = false;
+                }
+            }
+            onTapped: {
+                if (root.previewHoldTriggered) {
+                    root.previewHoldTriggered = false;
+                    return;
+                }
+                if (root.menuOpen) {
+                    root.closeMenu();
+                    return;
+                }
+                root.selectRequested(root);
+            }
+        }
+        DragHandler {
+            id: swipeDragHandler
+
+            acceptedButtons: Qt.LeftButton
+            enabled: root.loadEnabled
+            target: null
+            xAxis.enabled: true
+            yAxis.enabled: false
+
+            onActiveChanged: {
+                if (active) {
+                    root.dragStartX = rowContent.x;
+                    root.selectRequested(root);
+                } else if (rowContent.x <= -root.actionWidth * 0.35) {
+                    root.openMenu();
+                } else {
+                    root.closeMenu();
+                }
+            }
+            onTranslationChanged: {
+                if (!active) {
+                    return;
+                }
+                rowContent.x = Math.max(-root.actionWidth, Math.min(0, root.dragStartX + translation.x));
+            }
+        }
+    }
+
+    component MetadataValue: Text {
+        color: root.hasForegroundColor ? root.foregroundColor : TouchTheme.secondaryText
+        elide: Text.ElideRight
+        font.family: TouchTheme.fontFamily
+        font.pixelSize: 13
+        verticalAlignment: Text.AlignVCenter
+    }
+    component SwipeLoadButton: Rectangle {
+        id: swipeLoadButton
+
+        required property color accentColor
+        required property string label
+
+        signal triggered
+
+        color: swipeLoadTapHandler.pressed ? TouchTheme.controlPressedBackground : TouchTheme.libraryHeaderBackground
+        opacity: enabled ? 1.0 : 0.42
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.top: parent.top
+            color: swipeLoadButton.accentColor
+            width: 2
+        }
+        Text {
+            anchors.centerIn: parent
+            color: swipeLoadButton.accentColor
+            font.family: TouchTheme.fontFamily
+            font.pixelSize: 14
+            font.weight: Font.Bold
+            text: swipeLoadButton.label
+        }
+        TapHandler {
+            id: swipeLoadTapHandler
+
+            enabled: swipeLoadButton.enabled
+            onTapped: swipeLoadButton.triggered()
+        }
+    }
+}
